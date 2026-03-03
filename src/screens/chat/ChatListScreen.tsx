@@ -6,7 +6,7 @@ import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
 import { SearchBar } from '../../components/domain/SearchBar';
 import { UserListItem } from '../../components/domain/UserListItem';
-import { mockChats } from '../../constants/mockData';
+import { useChats } from '../../context/ChatContext';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../types/navigation';
 
@@ -15,9 +15,10 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 export const ChatListScreen: React.FC = () => {
   const navigation = useNavigation() as Nav;
   const { spacing } = useTheme();
+  const { chats } = useChats();
   const [search, setSearch] = useState('');
 
-  const filtered = mockChats.filter(
+  const filtered = chats.filter(
     (c) => !search || c.name.toLowerCase().includes(search.toLowerCase())
   );
 

@@ -84,12 +84,12 @@ export const SchoolsScreen: React.FC = () => {
         }}
       >
         {viewMode === 'list' ? (
-          filtered.map((school, index) => (
+          <View style={{ marginTop: -44 }}>
+          {filtered.map((school, index) => (
             <View
               key={school.id}
               style={{
                 marginBottom: spacing.lg,
-                marginTop: index === 0 ? -spacing.md : 0,
               }}
             >
               <SchoolCard
@@ -98,7 +98,8 @@ export const SchoolsScreen: React.FC = () => {
                 cardBackgroundColor="#281328"
               />
             </View>
-          ))
+          ))}
+          </View>
         ) : (
           <View style={[styles.mapWrap, { height: mapHeight }]}>
             <MapView
