@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Share, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
@@ -31,6 +32,7 @@ const defaultSchool = {
 
 export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('schedule');
   const [isFavorite, setIsFavorite] = useState(false);
   const schoolFromList = mockSchools.find((s) => s.id === route.params.id);
@@ -53,14 +55,23 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
     }).catch(() => {});
   };
 
-  const shareButton = (
-    <TouchableOpacity
-      onPress={handleShare}
-      style={[styles.headerShareBtn, { borderRadius: radius.full, borderColor: '#9CA3AF' }]}
-      activeOpacity={0.7}
-    >
-      <Icon name="share-variant" size={22} color="#9CA3AF" />
-    </TouchableOpacity>
+  const headerRight = (
+    <View style={styles.headerRightStack}>
+      <TouchableOpacity
+        onPress={handleShare}
+        style={[styles.headerOverlayBtn, { borderRadius: radius.full }]}
+        activeOpacity={0.7}
+      >
+        <Icon name="share-variant" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => setIsFavorite((v) => !v)}
+        style={[styles.headerOverlayBtn, { borderRadius: radius.full, marginTop: 8 }]}
+        activeOpacity={0.7}
+      >
+        <Icon name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? '#EE2AEE' : '#FFFFFF'} />
+      </TouchableOpacity>
+    </View>
   );
 
   const tabs = [
@@ -69,8 +80,7 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   ];
 
   return (
-    <Screen>
-      <Header title={mockSchool.name} showBack rightComponent={shareButton} />
+    <Screen edges={[]}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
@@ -79,12 +89,6 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.heroWrap}>
           <Image source={{ uri: mockSchool.image }} style={styles.heroImage} />
           <View style={[styles.heroGradient, { backgroundColor: 'transparent' }]} />
-          <TouchableOpacity
-            style={[styles.favBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-            onPress={() => setIsFavorite((v) => !v)}
-          >
-            <Icon name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#EE2AEE' : '#FFFFFF'} />
-          </TouchableOpacity>
         </View>
 
         <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}>
@@ -105,7 +109,16 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
 
           <View style={{ marginTop: spacing.xl }}>
-            <TabSwitch tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+            <TabSwitch
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              containerRadius={50}
+              containerBgColor="#311831"
+              indicatorColor="#020617"
+              textColor="#9CA3AF"
+              activeTextColor="#FFFFFF"
+            />
           </View>
 
           {activeTab === 'schedule' && (
@@ -173,23 +186,31 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
+      <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <Header title="" showBack rightComponent={headerRight} transparent backButtonOverlay alignTop />
+      </View>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  heroWrap: { position: 'relative', height: 220 },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  heroWrap: { position: 'relative', height: 280 },
   heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  favBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerRightStack: { alignItems: 'center' },
+  headerOverlayBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   row: { flexDirection: 'row', alignItems: 'center' },
   iconBox: {
@@ -201,12 +222,4 @@ const styles = StyleSheet.create({
   },
   cardRow: { flexDirection: 'row', alignItems: 'center' },
   bottomBar: { flexDirection: 'row', alignItems: 'center' },
-  headerShareBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    marginRight: 12,
-  },
 });

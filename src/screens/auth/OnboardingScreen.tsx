@@ -424,10 +424,26 @@ const Step3Preferences: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
   const { colors, spacing } = useTheme();
   const dances = ['Salsa', 'Bachata', 'Hip-Hop', 'Tango', 'Kizomba', 'Swing', 'Zumba', 'Vals', 'Modern'];
   const [selected, setSelected] = useState(['Salsa']);
+  const [otherInterests, setOtherInterests] = useState('');
 
   const toggle = (dance: string) => {
     if (selected.includes(dance)) setSelected(selected.filter((d) => d !== dance));
     else setSelected([...selected, dance]);
+  };
+
+  const handleSave = async () => {
+    try {
+      const { storage } = await import('../../services/storage');
+      const current = await storage.getProfile();
+      await storage.setProfile({
+        ...current,
+        favoriteDances: selected,
+        otherInterests: otherInterests.trim(),
+      });
+    } catch {
+      // sessizce geç; profil olmadan da devam edilebilsin
+    }
+    onFinish();
   };
 
   return (
@@ -454,11 +470,16 @@ const Step3Preferences: React.FC<{ onFinish: () => void }> = ({ onFinish }) => {
 
       <View style={{ marginTop: spacing.xxxl }}>
         <Text style={[{ fontWeight: '600', fontSize: 14, color: colors.text, marginBottom: spacing.sm }]}>Diğer ilgi alanları</Text>
-        <Input placeholder="Örn: Bale, Pilates..." leftIcon="pencil" />
+        <Input
+          placeholder="Örn: Bale, Pilates..."
+          leftIcon="pencil"
+          value={otherInterests}
+          onChangeText={setOtherInterests}
+        />
       </View>
 
       <View style={{ flex: 1 }} />
-      <Button title="Kaydet ve Başla" onPress={onFinish} fullWidth iconRight="arrow-right" size="lg" />
+      <Button title="Kaydet ve Başla" onPress={handleSave} fullWidth iconRight="arrow-right" size="lg" />
     </ScrollView>
   );
 };
@@ -541,9 +562,7 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation, route }) => {
             ))}
         </View>
 
-          <TouchableOpacity onPress={handleFinish}>
-            <Text style={[{ fontSize: 14, fontWeight: '600', color: colors.textTertiary }]}>Atla</Text>
-          </TouchableOpacity>
+          <View style={styles.backBtn} />
         </View>
 
         <View style={[styles.stepWrapper, { paddingHorizontal: spacing.lg }]}>

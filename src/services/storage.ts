@@ -5,6 +5,9 @@ export interface StoredProfile {
   username: string;
   avatarUri: string | null;
   bio: string;
+  email: string;
+  favoriteDances?: string[];
+  otherInterests?: string;
 }
 
 const DEFAULT_PROFILE: StoredProfile = {
@@ -12,6 +15,9 @@ const DEFAULT_PROFILE: StoredProfile = {
   username: 'elifyilmaz',
   avatarUri: null,
   bio: 'Salsa ve Bachata tutkunu. Yeni insanlarla tanışıp dans etmeyi seviyorum!',
+  email: '',
+  favoriteDances: [],
+  otherInterests: '',
 };
 
 const KEYS = {
@@ -75,7 +81,14 @@ export const storage = {
 
   async getProfile(): Promise<StoredProfile> {
     const v = await this.getItem<StoredProfile>(KEYS.PROFILE);
-    return v ?? DEFAULT_PROFILE;
+    if (!v) return DEFAULT_PROFILE;
+    return {
+      ...DEFAULT_PROFILE,
+      ...v,
+      email: v.email ?? '',
+      favoriteDances: v.favoriteDances ?? [],
+      otherInterests: v.otherInterests ?? '',
+    };
   },
 
   async setProfile(profile: StoredProfile): Promise<void> {

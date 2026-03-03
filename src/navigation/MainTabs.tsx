@@ -46,15 +46,18 @@ export const MainTabs: React.FC = () => {
           fontWeight: '600',
           marginTop: -2,
         },
-        tabBarStyle: {
-          backgroundColor: colors.tabBarBg,
-          borderTopColor: colors.tabBarBorder,
-          borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 85 : 65,
-          paddingTop: spacing.sm,
-          paddingBottom: Platform.OS === 'ios' ? 25 : spacing.sm,
-          ...shadows.md,
-        },
+        tabBarStyle:
+          route.name === 'Schools' && (route.params as { isMapView?: boolean } | undefined)?.isMapView
+            ? { display: 'none' }
+            : {
+                backgroundColor: colors.tabBarBg,
+                borderTopColor: colors.tabBarBorder,
+                borderTopWidth: 1,
+                height: Platform.OS === 'ios' ? 85 : 65,
+                paddingTop: spacing.sm,
+                paddingBottom: Platform.OS === 'ios' ? 25 : spacing.sm,
+                ...shadows.md,
+              },
         tabBarIcon: ({ focused, color, size }) => {
           const iconSet = tabIcons[route.name as keyof MainTabsParamList];
           const iconName = focused ? iconSet.active : iconSet.inactive;

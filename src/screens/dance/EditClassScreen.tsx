@@ -7,6 +7,7 @@ import { Header } from '../../components/layout/Header';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Icon } from '../../components/ui/Icon';
+import { ConfirmModal } from '../../components/feedback/ConfirmModal';
 
 const formatEventDateTime = (d: Date): string => {
   const dateStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -89,8 +90,34 @@ export const EditClassScreen: React.FC = () => {
   const [showDancePicker, setShowDancePicker] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [showLevelPicker, setShowLevelPicker] = useState(false);
+  const [className, setClassName] = useState('');
+  const [instructor, setInstructor] = useState('');
+  const [description, setDescription] = useState('');
+  const [participantLimit, setParticipantLimit] = useState('');
+  const [fee, setFee] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [alertModal, setAlertModal] = useState<{ title: string; message: string } | null>(null);
   const timeListRef = useRef<ScrollView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const validateAndSave = () => {
+    const next: Record<string, string> = {};
+    if (!className.trim()) next.className = 'Ders adı zorunludur';
+    if (!instructor.trim()) next.instructor = 'Eğitmen zorunludur';
+    if (!description.trim()) next.description = 'Açıklama zorunludur';
+    if (!eventDateTime) next.dateTime = 'Tarih ve saat seçiniz';
+    if (!locationAddress) next.location = 'Konum seçiniz';
+    if (!selectedDanceType) next.danceType = 'Dans türü seçiniz';
+    if (!selectedLevel) next.level = 'Seviye seçiniz';
+    if (!participantLimit.trim()) next.participantLimit = 'Katılımcı limiti zorunludur';
+    if (!fee.trim()) next.fee = 'Ücret zorunludur';
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      setAlertModal({ title: 'Eksik Bilgi', message: 'Lütfen tüm zorunlu alanları doldurun.' });
+      return;
+    }
+    navigation.goBack();
+  };
 
   useEffect(() => {
     if (showDatePicker) {
@@ -125,6 +152,7 @@ export const EditClassScreen: React.FC = () => {
     const result = new Date(dateToUse);
     result.setHours(t.getHours(), t.getMinutes(), 0, 0);
     setEventDateTime(result);
+    setErrors((e) => ({ ...e, dateTime: '' }));
     setShowDatePicker(false);
   };
 
@@ -173,6 +201,7 @@ export const EditClassScreen: React.FC = () => {
       } else {
         setLocationAddress(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
       }
+      setErrors((e) => ({ ...e, location: '' }));
     } catch {
     } finally {
       setLocationLoading(false);
@@ -181,7 +210,16 @@ export const EditClassScreen: React.FC = () => {
 
   return (
     <Screen>
-      <Header title="Ders Oluştur" showBack rightIcon="check" onRightPress={() => navigation.goBack()} />
+      <ConfirmModal
+        visible={!!alertModal}
+        title={alertModal?.title ?? ''}
+        message={alertModal?.message ?? ''}
+        singleButton
+        confirmLabel="Tamam"
+        onCancel={() => setAlertModal(null)}
+        onConfirm={() => setAlertModal(null)}
+      />
+      <Header title="Ders Oluştur" showBack rightIcon="check" onRightPress={validateAndSave} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           ref={scrollViewRef}
@@ -192,6 +230,8 @@ export const EditClassScreen: React.FC = () => {
           <Input
             label="Ders adı"
             placeholder=""
+            value={className}
+            onChangeText={(t) => { setClassName(t); if (errors.className) setErrors((e) => ({ ...e, className: '' })); }}
             leftIcon="domain"
             leftIconColor={colors.primary}
             leftIconWithLabel
@@ -200,10 +240,14 @@ export const EditClassScreen: React.FC = () => {
             borderColor="rgba(255,255,255,0.12)"
             style={{ color: '#FFFFFF' }}
             placeholderTextColor="#6B7280"
+            error={errors.className}
+            required
           />
           <Input
             label="Eğitmen"
             placeholder=""
+            value={instructor}
+            onChangeText={(t) => { setInstructor(t); if (errors.instructor) setErrors((e) => ({ ...e, instructor: '' })); }}
             leftIcon="account"
             leftIconColor={colors.primary}
             leftIconWithLabel
@@ -213,10 +257,14 @@ export const EditClassScreen: React.FC = () => {
             containerStyle={{ marginTop: spacing.lg }}
             style={{ color: '#FFFFFF' }}
             placeholderTextColor="#6B7280"
+            error={errors.instructor}
+            required
           />
           <Input
             label="Açıklama"
             placeholder=""
+            value={description}
+            onChangeText={(t) => { setDescription(t); if (errors.description) setErrors((e) => ({ ...e, description: '' })); }}
             leftIcon="file-document-outline"
             leftIconColor={colors.primary}
             leftIconWithLabel
@@ -227,6 +275,8 @@ export const EditClassScreen: React.FC = () => {
             style={{ color: '#FFFFFF' }}
             placeholderTextColor="#6B7280"
             multiline
+            error={errors.description}
+            required
           />
 
           <View style={{ marginTop: spacing.lg }}>
@@ -235,18 +285,20 @@ export const EditClassScreen: React.FC = () => {
                 <Icon name="calendar" size={18} color={colors.primary} />
               </View>
               <Text style={[typography.label, { color: '#9CA3AF' }]}>Tarih ve Saat</Text>
+            <Text style={[typography.label, { color: colors.error, marginLeft: 2 }]}>*</Text>
             </View>
             <View style={{ height: spacing.xs }} />
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={openDatePicker}
-              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
+              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: errors.dateTime ? colors.error : 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
             >
               <Text style={[typography.body, { color: eventDateTime ? '#FFFFFF' : '#6B7280', flex: 1 }]} numberOfLines={1}>
                 {eventDateTime ? formatEventDateTime(eventDateTime) : ''}
               </Text>
               <Icon name="pencil" size={20} color="#FFFFFF" style={{ marginLeft: spacing.sm }} />
             </TouchableOpacity>
+            {errors.dateTime ? <Text style={[typography.caption, { color: colors.error, marginTop: spacing.xs }]}>{errors.dateTime}</Text> : null}
           </View>
 
           {showDatePicker && (
@@ -331,19 +383,21 @@ export const EditClassScreen: React.FC = () => {
                 <Icon name="map-marker" size={18} color={colors.primary} />
               </View>
               <Text style={[typography.label, { color: '#9CA3AF' }]}>Konum / Yer</Text>
+            <Text style={[typography.label, { color: colors.error, marginLeft: 2 }]}>*</Text>
             </View>
             <View style={{ height: spacing.xs }} />
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={pickLocation}
               disabled={locationLoading}
-              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
+              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: errors.location ? colors.error : 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
             >
               <Text style={[typography.body, { color: locationAddress ? '#FFFFFF' : '#6B7280', flex: 1 }]} numberOfLines={2}>
                 {locationLoading ? 'Konum alınıyor...' : locationAddress || 'Konum seçin'}
               </Text>
               <Icon name={locationAddress ? 'pencil' : 'map-marker'} size={20} color="#FFFFFF" style={{ marginLeft: spacing.sm }} />
             </TouchableOpacity>
+            {errors.location ? <Text style={[typography.caption, { color: colors.error, marginTop: spacing.xs }]}>{errors.location}</Text> : null}
           </View>
 
           <View style={{ marginTop: spacing.lg }}>
@@ -352,18 +406,20 @@ export const EditClassScreen: React.FC = () => {
                 <Icon name="music" size={18} color={colors.primary} />
               </View>
               <Text style={[typography.label, { color: '#9CA3AF' }]}>Dans Türü</Text>
+            <Text style={[typography.label, { color: colors.error, marginLeft: 2 }]}>*</Text>
             </View>
             <View style={{ height: spacing.xs }} />
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setShowDancePicker(true)}
-              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
+              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: errors.danceType ? colors.error : 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
             >
               <Text style={[typography.body, { color: selectedDanceType ? '#FFFFFF' : '#6B7280', flex: 1 }]} numberOfLines={1}>
                 {selectedDanceType || 'Dans türü seçin'}
               </Text>
               <Icon name="chevron-down" size={20} color="#FFFFFF" style={{ marginLeft: spacing.sm }} />
             </TouchableOpacity>
+            {errors.danceType ? <Text style={[typography.caption, { color: colors.error, marginTop: spacing.xs }]}>{errors.danceType}</Text> : null}
           </View>
 
           {showDancePicker && (
@@ -383,7 +439,7 @@ export const EditClassScreen: React.FC = () => {
                       <TouchableOpacity
                         key={name}
                         style={[styles.pickerRow, { backgroundColor: selectedDanceType === name ? 'rgba(255,255,255,0.12)' : 'transparent' }]}
-                        onPress={() => { setSelectedDanceType(name); setShowDancePicker(false); }}
+                        onPress={() => { setSelectedDanceType(name); setErrors((e) => ({ ...e, danceType: '' })); setShowDancePicker(false); }}
                         activeOpacity={0.7}
                       >
                         <Text style={[typography.body, { color: '#FFFFFF', fontSize: 16 }]}>{name}</Text>
@@ -427,18 +483,20 @@ export const EditClassScreen: React.FC = () => {
                 <Icon name="chart-line" size={18} color={colors.primary} />
               </View>
               <Text style={[typography.label, { color: '#9CA3AF' }]}>Seviye</Text>
+            <Text style={[typography.label, { color: colors.error, marginLeft: 2 }]}>*</Text>
             </View>
             <View style={{ height: spacing.xs }} />
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setShowLevelPicker(true)}
-              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
+              style={[styles.dateInputRow, { backgroundColor: 'transparent', borderRadius: radius.xl, borderWidth: borders.thin, borderColor: errors.level ? colors.error : 'rgba(255,255,255,0.12)', paddingHorizontal: spacing.lg }]}
             >
               <Text style={[typography.body, { color: selectedLevel ? '#FFFFFF' : '#6B7280', flex: 1 }]} numberOfLines={1}>
                 {selectedLevel || 'Seviye seçin'}
               </Text>
               <Icon name="chevron-down" size={20} color="#FFFFFF" style={{ marginLeft: spacing.sm }} />
             </TouchableOpacity>
+            {errors.level ? <Text style={[typography.caption, { color: colors.error, marginTop: spacing.xs }]}>{errors.level}</Text> : null}
           </View>
 
           {showLevelPicker && (
@@ -458,7 +516,7 @@ export const EditClassScreen: React.FC = () => {
                       <TouchableOpacity
                         key={name}
                         style={[styles.pickerRow, { backgroundColor: selectedLevel === name ? 'rgba(255,255,255,0.12)' : 'transparent' }]}
-                        onPress={() => { setSelectedLevel(name); setShowLevelPicker(false); }}
+                        onPress={() => { setSelectedLevel(name); setErrors((e) => ({ ...e, level: '' })); setShowLevelPicker(false); }}
                         activeOpacity={0.7}
                       >
                         <Text style={[typography.body, { color: '#FFFFFF', fontSize: 16 }]}>{name}</Text>
@@ -474,6 +532,8 @@ export const EditClassScreen: React.FC = () => {
           <Input
             label="Katılımcı Limiti"
             placeholder=""
+            value={participantLimit}
+            onChangeText={(t) => { setParticipantLimit(t); if (errors.participantLimit) setErrors((e) => ({ ...e, participantLimit: '' })); }}
             leftIcon="account-group"
             leftIconColor={colors.primary}
             leftIconWithLabel
@@ -484,10 +544,14 @@ export const EditClassScreen: React.FC = () => {
             style={{ color: '#FFFFFF' }}
             placeholderTextColor="#6B7280"
             keyboardType="number-pad"
+            error={errors.participantLimit}
+            required
           />
           <Input
             label="Ücret"
             placeholder=""
+            value={fee}
+            onChangeText={(t) => { setFee(t); if (errors.fee) setErrors((e) => ({ ...e, fee: '' })); }}
             leftIcon="tag-outline"
             leftIconColor={colors.primary}
             leftIconWithLabel
@@ -498,8 +562,10 @@ export const EditClassScreen: React.FC = () => {
             style={{ color: '#FFFFFF' }}
             placeholderTextColor="#6B7280"
             onFocus={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            error={errors.fee}
+            required
           />
-          <Button title="Kaydet" onPress={() => navigation.goBack()} fullWidth size="lg" style={{ marginTop: spacing.xxl }} />
+          <Button title="Kaydet" onPress={validateAndSave} fullWidth size="lg" style={{ marginTop: spacing.xxl }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

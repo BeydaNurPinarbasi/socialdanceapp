@@ -96,7 +96,12 @@ export const ExploreScreen: React.FC = () => {
         }
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
       >
-        <Text style={[typography.captionBold, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
+        <Text
+          style={[
+            typography.captionBold,
+            { color: colors.textSecondary, marginBottom: spacing.sm, marginTop: -spacing.md },
+          ]}
+        >
           {filteredEvents.length} Etkinlik Bulundu
         </Text>
 

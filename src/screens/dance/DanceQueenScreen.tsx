@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from '../../types/navigation';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
@@ -17,8 +19,10 @@ const mockAttendees = [
   { id: '4', name: 'Mehmet', avatar: 'https://i.pravatar.cc/150?u=4', voted: false },
 ];
 
+type Nav = NativeStackNavigationProp<MainStackParamList>;
+
 export const DanceQueenScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<Nav>();
   const { colors, spacing, typography } = useTheme();
   const [attendees, setAttendees] = useState(mockAttendees);
   const [seconds, setSeconds] = useState(300); // 5 min
@@ -78,7 +82,15 @@ export const DanceQueenScreen: React.FC = () => {
           >
             <Card style={a.voted ? { borderWidth: 2, borderColor: colors.primary } : {}}>
               <View style={styles.attendeeRow}>
-                <Avatar source={a.avatar} size="lg" />
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    navigation.navigate('UserProfile', { userId: a.id, name: a.name, avatar: a.avatar });
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Avatar source={a.avatar} size="lg" />
+                </TouchableOpacity>
                 <Text style={[typography.bodyBold, { color: colors.text, marginLeft: spacing.md, flex: 1 }]}>{a.name}</Text>
                 {a.voted ? (
                   <Icon name="check-circle" size={28} color={colors.primary} />

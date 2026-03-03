@@ -18,11 +18,28 @@ const seller = {
   avatar: 'https://i.pravatar.cc/150?u=seller',
 };
 
-const defaultProduct = {
-  id: '1',
-  title: 'Salsa Ayakkabısı',
-  price: '₺450',
-  image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400',
+const PRODUCTS: Record<string, { id: string; title: string; price: string; image: string; description: string }> = {
+  '1': {
+    id: '1',
+    title: 'Salsa Ayakkabısı',
+    price: '₺450',
+    image: 'https://picsum.photos/seed/salsa-shoe/300/200',
+    description: 'Profesyonel salsa ayakkabısı, az kullanılmış. Numara 38.',
+  },
+  '2': {
+    id: '2',
+    title: 'Bachata Eteği',
+    price: '₺280',
+    image: 'https://picsum.photos/seed/dance-skirt/300/200',
+    description: 'Dans için özel tasarım bachata eteği. Rahat hareket imkânı.',
+  },
+  '3': {
+    id: '3',
+    title: 'Tango Pabuç',
+    price: '₺520',
+    image: 'https://picsum.photos/seed/tango-shoe/300/200',
+    description: 'Klasik tango pabuç, topuklu. Numara 37.',
+  },
 };
 
 export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
@@ -30,14 +47,14 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { addItem } = useCart();
   const [addedModalVisible, setAddedModalVisible] = useState(false);
 
-  const productName = defaultProduct.title;
+  const product = PRODUCTS[route.params.id] ?? PRODUCTS['1'];
 
   const handleAddToCart = () => {
     addItem({
-      id: defaultProduct.id,
-      title: defaultProduct.title,
-      price: defaultProduct.price,
-      image: defaultProduct.image,
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      image: product.image,
     });
     setAddedModalVisible(true);
   };
@@ -65,30 +82,33 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <Header title="Marketplace" showBack />
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400' }}
+          source={{ uri: product.image }}
           style={[styles.image, { backgroundColor: colors.surfaceSecondary }]}
         />
         <View style={{ padding: spacing.lg }}>
-          <Text style={[typography.h3, { color: '#FFFFFF' }]}>{productName}</Text>
-          <Text style={[typography.h4, { color: colors.primary, marginTop: spacing.sm }]}>₺450</Text>
+          <Text style={[typography.h3, { color: '#FFFFFF' }]}>{product.title}</Text>
+          <Text style={[typography.h4, { color: colors.primary, marginTop: spacing.sm }]}>{product.price}</Text>
 
           <View style={[styles.sellerRow, { marginTop: spacing.xl, padding: spacing.md, backgroundColor: '#482347', borderRadius: radius.lg }]}>
-            <Avatar source="https://i.pravatar.cc/150?u=seller" size="md" />
-            <View style={{ marginLeft: spacing.md, flex: 1 }}>
-              <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>Satıcı</Text>
-              <Text style={[typography.caption, { color: 'rgba(255,255,255,0.7)' }]}>⭐ 4.8</Text>
-            </View>
             <TouchableOpacity
-            onPress={openChatWithSeller}
-            style={[styles.mesajBtn, { borderColor: '#9CA3AF', borderRadius: radius.full }]}
-            activeOpacity={0.7}
-          >
-            <Text style={[typography.captionBold, { color: '#9CA3AF' }]}>Mesaj</Text>
-          </TouchableOpacity>
+              onPress={() => navigation.navigate('UserProfile', { userId: seller.id, name: seller.name, avatar: seller.avatar })}
+              style={styles.sellerInfo}
+              activeOpacity={0.7}
+            >
+              <Avatar source={seller.avatar} size="md" />
+              <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginLeft: spacing.md }]}>{seller.name}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={openChatWithSeller}
+              style={[styles.mesajBtn, { borderColor: '#9CA3AF', borderRadius: radius.full }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[typography.captionBold, { color: '#9CA3AF' }]}>Mesaj</Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={[typography.bodySmall, { color: 'rgba(255,255,255,0.85)', marginTop: spacing.xl }]}>
-            Profesyonel salsa ayakkabısı, az kullanılmış. Numara 38.
+            {product.description}
           </Text>
         </View>
       </ScrollView>
@@ -102,6 +122,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   image: { width: '100%', height: 300, resizeMode: 'cover' },
   sellerRow: { flexDirection: 'row', alignItems: 'center' },
+  sellerInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   mesajBtn: {
     borderWidth: 1,
     paddingHorizontal: 16,

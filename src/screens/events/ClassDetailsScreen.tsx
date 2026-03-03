@@ -1,13 +1,12 @@
 import React from 'react';
 import { View, Text, Image, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
 import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
-import { Avatar } from '../../components/ui/Avatar';
-import { Card } from '../../components/ui/Card';
 import { MainStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ClassDetails'>;
@@ -25,15 +24,23 @@ const mockClass = {
   requirements: ['Rahat kıyafet', 'Su'],
 };
 
+const CARD_BG = '#311831';
+const CARD_BORDER = 'rgba(255,255,255,0.12)';
+
 export const ClassDetailsScreen: React.FC<Props> = ({ navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
-    <Screen>
-      <Header title="" showBack />
+    <Screen edges={[]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroWrap}>
-          <Image source={{ uri: mockClass.image }} style={styles.heroImage} />
+        <View style={styles.instructorHero}>
+          <Image source={{ uri: mockClass.instructorAvatar }} style={styles.instructorPhoto} />
+          <View style={styles.instructorOverlay} />
+          <View style={styles.instructorInfo}>
+            <Text style={[typography.h4, { color: '#FFFFFF' }]}>{mockClass.instructor}</Text>
+            <Text style={[typography.caption, { color: 'rgba(255,255,255,0.8)' }]}>Eğitmen</Text>
+          </View>
         </View>
 
         <View style={{ paddingHorizontal: spacing.lg }}>
@@ -42,28 +49,20 @@ export const ClassDetailsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           <Text style={[typography.h3, { color: '#FFFFFF', marginTop: spacing.sm }]}>{mockClass.title}</Text>
 
-          <View style={[styles.instructorRow, { marginTop: spacing.lg }]}>
-            <Avatar source={mockClass.instructorAvatar} size="md" />
-            <View style={{ marginLeft: spacing.md }}>
-              <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>{mockClass.instructor}</Text>
-              <Text style={[typography.caption, { color: 'rgba(255,255,255,0.8)' }]}>Eğitmen</Text>
-            </View>
-          </View>
-
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xl }}>
-            <View style={[styles.detailBox, { backgroundColor: colors.surfaceSecondary, borderRadius: radius.lg, padding: spacing.md }]}>
+            <View style={[styles.detailBox, { backgroundColor: CARD_BG, borderWidth: 1, borderColor: CARD_BORDER, borderRadius: radius.lg, padding: spacing.md }]}>
               <Icon name="calendar-clock" size={20} color={colors.primary} />
-              <Text style={[typography.caption, { color: 'rgba(255,255,255,0.8)', marginTop: 4 }]}>{mockClass.day} • {mockClass.time}</Text>
+              <Text style={[typography.caption, { color: 'rgba(255,255,255,0.85)', marginTop: 4 }]}>{mockClass.day} • {mockClass.time}</Text>
             </View>
-            <View style={[styles.detailBox, { backgroundColor: colors.surfaceSecondary, borderRadius: radius.lg, padding: spacing.md }]}>
+            <View style={[styles.detailBox, { backgroundColor: CARD_BG, borderWidth: 1, borderColor: CARD_BORDER, borderRadius: radius.lg, padding: spacing.md }]}>
               <Icon name="timer-outline" size={20} color={colors.primary} />
-              <Text style={[typography.caption, { color: 'rgba(255,255,255,0.8)', marginTop: 4 }]}>{mockClass.duration}</Text>
+              <Text style={[typography.caption, { color: 'rgba(255,255,255,0.85)', marginTop: 4 }]}>{mockClass.duration}</Text>
             </View>
           </View>
 
           <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginTop: spacing.xl }]}>Gerekli malzemeler</Text>
           {mockClass.requirements.map((r, i) => (
-            <View key={i} style={[styles.row, { marginTop: spacing.sm }]}>
+            <View key={i} style={[styles.requirementRow, { backgroundColor: CARD_BG, borderColor: CARD_BORDER, borderRadius: radius.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, marginTop: spacing.sm }]}>
               <Icon name="check-circle" size={18} color={colors.success} />
               <Text style={[typography.bodySmall, { color: '#FFFFFF', marginLeft: 8 }]}>{r}</Text>
             </View>
@@ -72,15 +71,46 @@ export const ClassDetailsScreen: React.FC<Props> = ({ navigation }) => {
           <Button title="Kayıt Ol" onPress={() => {}} fullWidth size="lg" style={{ marginTop: spacing.xxl }} />
         </View>
       </ScrollView>
+      <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <Header title="" showBack transparent backButtonOverlay alignTop />
+      </View>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  heroWrap: { height: 200 },
-  heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  instructorHero: {
+    position: 'relative',
+    height: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a0d1a',
+  },
+  instructorPhoto: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  instructorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  instructorInfo: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
   tag: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  instructorRow: { flexDirection: 'row', alignItems: 'center' },
   detailBox: { minWidth: 120 },
-  row: { flexDirection: 'row', alignItems: 'center' },
+  requirementRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
 });

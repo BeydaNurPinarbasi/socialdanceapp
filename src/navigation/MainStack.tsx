@@ -22,6 +22,7 @@ import { SettingsPasswordScreen } from '../screens/social/SettingsPasswordScreen
 import { SettingsPaymentsScreen } from '../screens/social/SettingsPaymentsScreen';
 import { SettingsHelpScreen } from '../screens/social/SettingsHelpScreen';
 import { SettingsAboutScreen } from '../screens/social/SettingsAboutScreen';
+import { ViewUserProfileScreen } from '../screens/social/ViewUserProfileScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -49,6 +50,7 @@ export const MainStack: React.FC = () => {
       <Stack.Screen name="SettingsPayments" component={SettingsPaymentsScreen} />
       <Stack.Screen name="SettingsHelp" component={SettingsHelpScreen} />
       <Stack.Screen name="SettingsAbout" component={SettingsAboutScreen} />
+      <Stack.Screen name="UserProfile" component={ViewUserProfileScreen} />
     </Stack.Navigator>
   );
 };

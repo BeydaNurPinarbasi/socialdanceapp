@@ -26,6 +26,8 @@ interface MyEventCardProps {
   onPress: () => void;
   onFavoritePress?: () => void;
   onReservationPress?: () => void;
+  /** Avatar tıklandığında (index, avatarUri) ile çağrılır */
+  onAvatarPress?: (index: number, avatarUri: string) => void;
 }
 
 const CARD_BG = '#331C3C';
@@ -37,13 +39,14 @@ export const MyEventCard: React.FC<MyEventCardProps> = ({
   onPress,
   onFavoritePress,
   onReservationPress,
+  onAvatarPress,
 }) => {
   const { colors, spacing, radius, typography } = useTheme();
   const avatars = event.attendeeAvatars ?? [
     'https://i.pravatar.cc/150?u=21',
     'https://i.pravatar.cc/150?u=22',
+    'https://i.pravatar.cc/150?u=23',
   ];
-  const extraCount = event.attendees != null ? Math.max(0, event.attendees - avatars.length) : 24;
 
   return (
     <TouchableOpacity
@@ -97,12 +100,34 @@ export const MyEventCard: React.FC<MyEventCardProps> = ({
 
       <View style={[styles.footer, { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md }]}>
         <View style={styles.avatarsRow}>
-          {avatars.slice(0, 2).map((uri, i) => (
-            <Avatar key={i} source={uri} size="sm" showBorder borderColor={CARD_BG} style={i === 1 ? styles.avatarOverlap : undefined} />
-          ))}
-          {extraCount > 0 && (
-            <Text style={[typography.caption, { color: 'rgba(255,255,255,0.6)', marginLeft: 6 }]}>+{extraCount}</Text>
-          )}
+          {avatars.slice(0, 3).map((uri, i) => {
+            const avatarNode = (
+              <Avatar
+                key={i}
+                source={uri}
+                size="sm"
+                showBorder
+                borderColor={CARD_BG}
+                style={i === 0 ? undefined : styles.avatarOverlap}
+              />
+            );
+            if (onAvatarPress) {
+              return (
+                <TouchableOpacity
+                  key={i}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onAvatarPress(i, uri);
+                  }}
+                  style={i === 0 ? undefined : styles.avatarOverlap}
+                  activeOpacity={0.8}
+                >
+                  {avatarNode}
+                </TouchableOpacity>
+              );
+            }
+            return avatarNode;
+          })}
         </View>
         <TouchableOpacity
           onPress={(e) => {

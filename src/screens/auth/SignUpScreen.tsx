@@ -8,12 +8,17 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Icon } from '../../components/ui/Icon';
 import { AuthStackParamList } from '../../types/navigation';
+import { storage } from '../../services/storage';
+import { useProfile } from '../../context/ProfileContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SignUp'>;
 
+// Türkçe büyük harfler dahil (İ, Ö, Ü, Ç, Ş, Ğ)
+const hasUppercase = (p: string) => /[A-ZİÖÜÇŞĞ]/.test(p);
+
 const requirements = [
   { key: 'length', label: 'En az 8 karakter', check: (p: string) => p.length >= 8 },
-  { key: 'upper', label: 'En az 1 büyük harf', check: (p: string) => /[A-Z]/.test(p) },
+  { key: 'upper', label: 'En az 1 büyük harf', check: hasUppercase },
   { key: 'digitOrSymbol', label: 'En az 1 rakam veya sembol', check: (p: string) => /[^a-zA-Z]/.test(p) },
 ] as const;
 
@@ -21,6 +26,7 @@ const inputBorderColor = 'rgba(255,255,255,0.25)';
 
 export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
   const { colors, spacing, typography } = useTheme();
+  const { setProfileFromStored } = useProfile();
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -49,8 +55,20 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
     passwordRepeat.length > 0 &&
     passwordRepeat === password;
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!isFormValid) return;
+    const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+    const username = email.trim().split('@')[0] || 'kullanici';
+    const profileToStore = {
+      displayName: displayName || 'Kullanıcı',
+      username,
+      avatarUri: null,
+      bio: '',
+      email: email.trim(),
+    };
+    await storage.setProfile(profileToStore);
+    // Profil context'ini anında güncelle, uygulamayı yeniden açmaya gerek kalmasın
+    setProfileFromStored(profileToStore);
     navigation.replace('Onboarding', { startFromStep: 4 });
   };
 
@@ -114,6 +132,7 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
                 backgroundColor="transparent"
                 borderColor={inputBorderColor}
                 style={{ color: '#FFFFFF' }}
+                autoCorrect={false}
               />
               <Input
                 placeholder="Şifre Tekrar"
@@ -127,6 +146,7 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
                 backgroundColor="transparent"
                 borderColor={inputBorderColor}
                 style={{ color: '#FFFFFF' }}
+                autoCorrect={false}
               />
               <View style={[styles.requirementsBox, { backgroundColor: '#311831', borderRadius: 12, padding: spacing.lg, marginTop: spacing.lg }]}>
                 <Text style={[typography.label, { color: '#9CA3AF', marginBottom: spacing.sm }]}>GEREKSİNİMLER</Text>
@@ -142,7 +162,7 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.loginRow}>
               <Text style={[typography.caption, { color: '#FFFFFF' }]}>Zaten hesabın var mı? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <TouchableOpacity onPress={() => navigation.navigate('Onboarding', { startFromStep: 3 })}>
                 <Text style={[typography.captionBold, { color: '#FFFFFF' }]}>Giriş Yap</Text>
               </TouchableOpacity>
             </View>

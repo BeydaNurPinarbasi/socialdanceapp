@@ -21,10 +21,12 @@ export const EditProfileScreen: React.FC = () => {
   const [soyad, setSoyad] = useState(nameParts.slice(1).join(' ') ?? '');
   const [kullaniciAdi, setKullaniciAdi] = useState(profile.username);
   const [hakkimda, setHakkimda] = useState(profile.bio);
-  const [email, setEmail] = useState('elif@example.com');
+  const [email, setEmail] = useState(profile.email);
   const [telefon, setTelefon] = useState('');
   const [sehir, setSehir] = useState('İstanbul');
-  const [favoriDans, setFavoriDans] = useState('Salsa, Bachata');
+  const [favoriDans, setFavoriDans] = useState(
+    profile.favoriteDances && profile.favoriteDances.length > 0 ? profile.favoriteDances.join(', ') : '',
+  );
   const [alertModal, setAlertModal] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
@@ -34,7 +36,11 @@ export const EditProfileScreen: React.FC = () => {
     setKullaniciAdi(profile.username);
     setHakkimda(profile.bio);
     setAvatarUri(profile.avatarUri);
-  }, [profile.displayName, profile.username, profile.bio, profile.avatarUri]);
+    setEmail(profile.email);
+    setFavoriDans(
+      profile.favoriteDances && profile.favoriteDances.length > 0 ? profile.favoriteDances.join(', ') : '',
+    );
+  }, [profile.displayName, profile.username, profile.bio, profile.avatarUri, profile.email, profile.favoriteDances]);
 
   const openGalleryAndSetAvatar = () => {
     setTimeout(async () => {
@@ -85,11 +91,17 @@ export const EditProfileScreen: React.FC = () => {
   const handleSave = () => {
     const displayName = [ad.trim(), soyad.trim()].filter(Boolean).join(' ') || profile.displayName;
     const username = kullaniciAdi.trim().replace(/^@/, '') || profile.username;
+    const parsedFavoriteDances = favoriDans
+      .split(',')
+      .map((d) => d.trim())
+      .filter((d) => d.length > 0);
     updateProfile({
-      displayName: displayName || 'Elif Yılmaz',
-      username: username || 'elifyilmaz',
+      displayName: displayName || 'Kullanıcı',
+      username: username || profile.username,
       avatarUri,
       bio: hakkimda.trim() || profile.bio,
+      email: email.trim() || profile.email,
+      favoriteDances: parsedFavoriteDances,
     });
     navigation.goBack();
   };

@@ -43,7 +43,9 @@ export const MarketplaceScreen: React.FC = () => {
       />
       <View style={{ paddingHorizontal: spacing.lg }}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Ürün ara..." backgroundColor="#482347" />
-        <FilterBar filters={categories} activeFilter={activeCategory} onFilterChange={setActiveCategory} />
+        <View style={{ marginTop: spacing.md }}>
+          <FilterBar filters={categories} activeFilter={activeCategory} onFilterChange={setActiveCategory} />
+        </View>
       </View>
 
       <FlatList

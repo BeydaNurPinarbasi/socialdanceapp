@@ -160,6 +160,7 @@ export const ProfileScreen: React.FC = () => {
                     name={user.name}
                     subtitle={user.handle}
                     avatar={user.img}
+                    onPress={() => (navigation.getParent() as any)?.navigate('UserProfile', { userId: String(user.id), name: user.name, username: user.handle, avatar: user.img })}
                     rightLabel={rightLabel}
                     rightVariant={activeTab === 'requests' ? 'primary' : 'outline'}
                     onRightPress={onRightPress}

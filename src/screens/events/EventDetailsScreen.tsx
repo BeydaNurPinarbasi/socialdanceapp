@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Share } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Share, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
@@ -9,7 +10,7 @@ import { Icon } from '../../components/ui/Icon';
 import { Avatar } from '../../components/ui/Avatar';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { ConfirmModal } from '../../components/feedback/ConfirmModal';
-import { mockEvents } from '../../constants/mockData';
+import { mockEvents, mockFavoritesEvents } from '../../constants/mockData';
 import { MainStackParamList } from '../../types/navigation';
 import { scheduleEventReminder } from '../../services/notifications';
 
@@ -17,13 +18,21 @@ type Props = NativeStackScreenProps<MainStackParamList, 'EventDetails'>;
 
 export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
-  const event = mockEvents.find((e) => e.id === route.params.id) || mockEvents[0];
+  const insets = useSafeAreaInsets();
+  const favoriteEvent = route.params.fromFavorites
+    ? mockFavoritesEvents.find((e) => String(e.id) === route.params.id)
+    : undefined;
+  const event =
+    favoriteEvent ??
+    mockEvents.find((e) => e.id === route.params.id) ??
+    mockEvents[0];
   const [isFavorite, setIsFavorite] = useState(false);
   const [reminderScheduled, setReminderScheduled] = useState(false);
   const [attending, setAttending] = useState(event.attendees ?? 12);
   const [hasJoined, setHasJoined] = useState(false);
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [friendsModalVisible, setFriendsModalVisible] = useState(false);
   const capacity = 50;
 
   const handleJoin = async () => {
@@ -53,18 +62,31 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
     }).catch(() => {});
   };
 
-  const shareButton = (
-    <TouchableOpacity
-      onPress={handleShare}
-      style={[styles.headerShareBtn, { borderRadius: radius.full, borderColor: '#9CA3AF' }]}
-      activeOpacity={0.7}
-    >
-      <Icon name="share-variant" size={22} color="#9CA3AF" />
-    </TouchableOpacity>
+  const headerRight = (
+    <View style={styles.headerRightStack}>
+      <TouchableOpacity
+        onPress={handleShare}
+        style={[styles.headerOverlayBtn, { borderRadius: radius.full }]}
+        activeOpacity={0.7}
+      >
+        <Icon name="share-variant" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={async () => {
+          const next = !isFavorite;
+          setIsFavorite(next);
+          if (next && event.rawDate) await scheduleEventReminder(event.title, event.rawDate);
+        }}
+        style={[styles.headerOverlayBtn, { borderRadius: radius.full, marginTop: 8 }]}
+        activeOpacity={0.7}
+      >
+        <Icon name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? '#EE2AEE' : '#FFFFFF'} />
+      </TouchableOpacity>
+    </View>
   );
 
   return (
-    <Screen>
+    <Screen edges={[]}>
       <ConfirmModal
         visible={joinModalVisible}
         title="Teşekkürler!"
@@ -83,11 +105,54 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
         onCancel={() => setLeaveModalVisible(false)}
         onConfirm={confirmLeave}
       />
-      <Header
-        title={event.title}
-        showBack
-        rightComponent={shareButton}
-      />
+      <Modal
+        visible={friendsModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFriendsModalVisible(false)}
+      >
+        <View style={styles.friendsModalOverlay}>
+          <TouchableOpacity
+            style={styles.friendsModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setFriendsModalVisible(false)}
+          />
+          <View style={[styles.friendsModalBox, { backgroundColor: '#2C1C2D', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }]}>
+            <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.md }]}>
+              Katılan arkadaşlar
+            </Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {(event.attendeeAvatars ?? ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2']).map(
+                (avatar, index) => {
+                  const name = `Dansçı ${index + 1}`;
+                  return (
+                    <TouchableOpacity
+                      key={avatar + index}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setFriendsModalVisible(false);
+                        navigation.navigate('UserProfile', { userId: `event-${event.id}-${index}`, name, avatar });
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}
+                    >
+                      <Avatar source={avatar} size="sm" />
+                      <Text style={[typography.bodySmall, { color: '#FFFFFF', marginLeft: spacing.md }]}>{name}</Text>
+                    </TouchableOpacity>
+                  );
+                },
+              )}
+            </ScrollView>
+            <Button
+              title="Kapat"
+              variant="secondary"
+              fullWidth
+              size="md"
+              style={{ marginTop: spacing.lg }}
+              onPress={() => setFriendsModalVisible(false)}
+            />
+          </View>
+        </View>
+      </Modal>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
@@ -96,16 +161,6 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.heroWrap}>
           <Image source={{ uri: event.image }} style={styles.heroImage} />
           <View style={[styles.heroGradient, { backgroundColor: 'transparent' }]} />
-          <TouchableOpacity
-            style={[styles.favBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-            onPress={async () => {
-              const next = !isFavorite;
-              setIsFavorite(next);
-              if (next && event.rawDate) await scheduleEventReminder(event.title, event.rawDate);
-            }}
-          >
-            <Icon name={isFavorite ? 'heart' : 'heart-outline'} size={24} color={isFavorite ? '#EE2AEE' : '#FFFFFF'} />
-          </TouchableOpacity>
         </View>
 
         <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}>
@@ -155,7 +210,9 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             </View>
 
-          <View
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setFriendsModalVisible(true)}
             style={[
               styles.friendsBorder,
               {
@@ -170,12 +227,24 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.friendsRow}>
               <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>Katılan arkadaşlar</Text>
               <View style={styles.avatars}>
-                {[1, 2, 3].map((i) => (
-                  <Avatar key={i} source={`https://i.pravatar.cc/150?u=${i}`} size="sm" style={{ marginLeft: -8 }} />
-                ))}
+                {(event.attendeeAvatars ?? ['https://i.pravatar.cc/150?u=1', 'https://i.pravatar.cc/150?u=2', 'https://i.pravatar.cc/150?u=3'])
+                  .slice(0, 3)
+                  .map((avatar, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      activeOpacity={0.8}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        navigation.navigate('UserProfile', { userId: `event-${event.id}-${i}`, name: `Dansçı ${i + 1}`, avatar });
+                      }}
+                      style={{ marginLeft: i === 0 ? 0 : -8 }}
+                    >
+                      <Avatar source={avatar} size="sm" />
+                    </TouchableOpacity>
+                  ))}
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => navigation.navigate('DanceQueen')}
@@ -190,7 +259,12 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginTop: spacing.xl }} />
           <View style={{ marginTop: spacing.lg }}>
             <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.sm }]}>Etkinlik açıklaması</Text>
-            <Text style={[typography.body, { color: 'rgba(255,255,255,0.85)', lineHeight: 22 }]}>
+            <Text
+              style={[
+                typography.bodySmall,
+                { color: 'rgba(255,255,255,0.85)', lineHeight: 18 },
+              ]}
+            >
               {event.description ?? `${event.title} ile unutulmaz bir dans gecesi sizi bekliyor. Canlı müzik ve harika bir atmosferde ${event.danceType ?? 'Latin'} ritimlerine kendinizi bırakın.`}
             </Text>
           </View>
@@ -205,15 +279,39 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
+      <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <Header
+          title=""
+          showBack
+          transparent
+          backButtonOverlay
+          alignTop
+          rightComponent={headerRight}
+        />
+      </View>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  heroWrap: { position: 'relative', height: 220 },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  heroWrap: { position: 'relative', height: 280 },
   heroImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  favBtn: { position: 'absolute', top: 16, right: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  headerRightStack: { alignItems: 'center' },
+  headerOverlayBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
   row: { flexDirection: 'row', alignItems: 'center' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBox: {
@@ -228,12 +326,16 @@ const styles = StyleSheet.create({
   avatars: { flexDirection: 'row', alignItems: 'center' },
   dqBanner: { flexDirection: 'row', alignItems: 'center' },
   bottomBar: { flexDirection: 'row', alignItems: 'center' },
-  headerShareBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    marginRight: 12,
+  friendsModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  friendsModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  friendsModalBox: {
+    width: '100%',
+    padding: 20,
   },
 });

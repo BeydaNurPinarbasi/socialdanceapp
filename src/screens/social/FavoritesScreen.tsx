@@ -101,9 +101,18 @@ export const FavoritesScreen: React.FC = () => {
                   attendeeAvatars: event.attendeeAvatars,
                   isDanceQueen: event.isDanceQueen,
                 }}
-                onPress={() => navigation.navigate('EventDetails', { id: String(event.id) })}
+                onPress={() => navigation.navigate('EventDetails', { id: String(event.id), fromFavorites: true })}
                 onFavoritePress={() => toggleFavorite(event.id as number)}
-                onReservationPress={() => {}}
+                onReservationPress={() =>
+                  navigation.navigate('EventDetails', { id: String(event.id), fromFavorites: true })
+                }
+                onAvatarPress={(index, avatarUri) =>
+                  (navigation.getParent() as any)?.navigate('UserProfile', {
+                    userId: `ev-${event.id}-${index}`,
+                    name: `Dansçı ${index + 1}`,
+                    avatar: avatarUri,
+                  })
+                }
               />
               {event.isDanceQueen && (
                 <TouchableOpacity

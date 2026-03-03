@@ -8,6 +8,9 @@ export interface Profile {
   username: string;
   avatarUri: string | null;
   bio: string;
+  email: string;
+  favoriteDances: string[];
+  otherInterests: string;
 }
 
 export function getAvatarSource(avatarUri: string | null): string {
@@ -29,6 +32,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     username: 'elifyilmaz',
     avatarUri: null,
     bio: 'Salsa ve Bachata tutkunu. Yeni insanlarla tanışıp dans etmeyi seviyorum!',
+    email: '',
+    favoriteDances: [],
+    otherInterests: '',
   });
 
   useEffect(() => {
@@ -38,6 +44,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         username: stored.username,
         avatarUri: stored.avatarUri,
         bio: stored.bio,
+        email: stored.email ?? '',
+        favoriteDances: stored.favoriteDances ?? [],
+        otherInterests: stored.otherInterests ?? '',
       });
     });
   }, []);
@@ -48,6 +57,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       username: stored.username,
       avatarUri: stored.avatarUri,
       bio: stored.bio,
+      email: stored.email ?? '',
+      favoriteDances: stored.favoriteDances ?? [],
+      otherInterests: stored.otherInterests ?? '',
     });
   }, []);
 
@@ -59,6 +71,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         username: next.username,
         avatarUri: next.avatarUri,
         bio: next.bio,
+        email: next.email ?? '',
+          favoriteDances: next.favoriteDances ?? [],
+          otherInterests: next.otherInterests ?? '',
       }).catch(() => {});
       return next;
     });

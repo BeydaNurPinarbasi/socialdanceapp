@@ -25,6 +25,8 @@ interface InputProps extends TextInputProps {
   leftIconBox?: boolean;
   /** Sol ikonu border dışında, label satırında (label yanında) göster */
   leftIconWithLabel?: boolean;
+  /** Zorunlu alan; label yanında kırmızı yıldız gösterir */
+  required?: boolean;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -42,6 +44,7 @@ export const Input: React.FC<InputProps> = ({
   placeholderTextColor: placeholderTextColorProp,
   leftIconBox: leftIconBoxProp,
   leftIconWithLabel: leftIconWithLabelProp = false,
+  required = false,
   style,
   multiline,
   ...props
@@ -71,16 +74,29 @@ export const Input: React.FC<InputProps> = ({
             </View>
           )}
           {label && (
-            <Text
-              style={[
-                typography.label,
-                { color: labelColor, marginBottom: spacing.xs },
-                leftIconWithLabel && { marginBottom: 0 },
-                !leftIconWithLabel && { marginLeft: spacing.xs },
-              ]}
-            >
-              {label}
-            </Text>
+            <View style={styles.labelTextRow}>
+              <Text
+                style={[
+                  typography.label,
+                  { color: labelColor, marginBottom: spacing.xs },
+                  leftIconWithLabel && { marginBottom: 0 },
+                  !leftIconWithLabel && { marginLeft: spacing.xs },
+                ]}
+              >
+                {label}
+              </Text>
+              {required && (
+                <Text
+                  style={[
+                    typography.label,
+                    { color: colors.error, marginBottom: spacing.xs, marginLeft: 2 },
+                    leftIconWithLabel && { marginBottom: 0 },
+                  ]}
+                >
+                  *
+                </Text>
+              )}
+            </View>
           )}
         </View>
       )}
@@ -171,6 +187,10 @@ const INPUT_HEIGHT = 52;
 
 const styles = StyleSheet.create({
   labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  labelTextRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
