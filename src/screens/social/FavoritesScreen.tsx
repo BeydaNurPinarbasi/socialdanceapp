@@ -5,7 +5,6 @@ import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { CollapsingHeaderScrollView } from '../../components/layout/CollapsingHeaderScrollView';
 import { MyEventCard } from '../../components/domain/MyEventCard';
-import { FilterBar } from '../../components/domain/FilterBar';
 import { TabSwitch } from '../../components/domain/TabSwitch';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { mockFavoritesEvents } from '../../constants/mockData';
@@ -14,13 +13,10 @@ import { MainStackParamList } from '../../types/navigation';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-const timeFilters = ['Tüm Zamanlar', 'Bu Yıl', 'Geçen Yıl'];
-
 export const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors, spacing, typography } = useTheme();
   const [activeTab, setActiveTab] = useState<'favorites' | 'history'>('favorites');
-  const [activeTimeFilter, setActiveTimeFilter] = useState('Tüm Zamanlar');
   const [events] = useState(mockFavoritesEvents);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(
     () => new Set(events.filter((e) => e.isFavorite).map((e) => e.id as number))
@@ -38,9 +34,6 @@ export const FavoritesScreen: React.FC = () => {
   const filtered = events.filter((e) => {
     if (activeTab === 'favorites' && !favoritedIds.has(e.id as number)) return false;
     if (activeTab === 'history' && !e.isPast) return false;
-    const year = new Date(e.date).getFullYear();
-    if (activeTimeFilter === 'Bu Yıl' && year !== 2024) return false;
-    if (activeTimeFilter === 'Geçen Yıl' && year !== 2023) return false;
     return true;
   });
 
@@ -72,13 +65,11 @@ export const FavoritesScreen: React.FC = () => {
               textColor="rgba(255,255,255,0.7)"
               activeTextColor="#FFFFFF"
             />
-            <View style={{ marginTop: spacing.sm }}>
-              <FilterBar filters={timeFilters} activeFilter={activeTimeFilter} onFilterChange={setActiveTimeFilter} />
-            </View>
           </View>
         }
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
       >
+        <View style={{ marginTop: -56 }}>
         <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
           {filtered.length} Etkinlik Bulundu
         </Text>
@@ -127,6 +118,7 @@ export const FavoritesScreen: React.FC = () => {
         ) : (
           <EmptyState icon="calendar-blank-outline" title="Bu filtreye uygun etkinlik yok." />
         )}
+        </View>
       </CollapsingHeaderScrollView>
     </Screen>
   );

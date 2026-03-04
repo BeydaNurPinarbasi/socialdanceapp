@@ -1,15 +1,28 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, Alert, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
+import { useChats } from '../../context/ChatContext';
 import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
 import { Icon } from '../../components/ui/Icon';
+import { Avatar } from '../../components/ui/Avatar';
 import { MainStackParamList } from '../../types/navigation';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ChatDetail'>;
 
-const mockMessages = [
+type MessageItem = {
+  id: string;
+  text?: string;
+  imageUri?: string;
+  voiceUri?: string;
+  durationSeconds?: number;
+  isMe: boolean;
+  time: string;
+};
+
+const mockMessages: MessageItem[] = [
   { id: '1', text: 'Merhaba! Yarın etkinlikte görüşürüz.', isMe: false, time: '14:30' },
   { id: '2', text: 'Merhaba! Evet, orada olacağım 💃', isMe: true, time: '14:32' },
 ];
@@ -18,16 +31,46 @@ type SheetAction = { id: string; label: string; icon: string; onPress: () => voi
 
 export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const { markAsRead } = useChats();
   const isNewChat = route.params.isNewChat ?? false;
   const [messages, setMessages] = useState(isNewChat ? [] : mockMessages);
   const [input, setInput] = useState('');
   const [sheetVisible, setSheetVisible] = useState(false);
   const [notificationsMuted, setNotificationsMuted] = useState(false);
 
+  useEffect(() => {
+    if (!isNewChat && route.params.id) {
+      markAsRead(route.params.id);
+    }
+  }, [route.params.id, isNewChat, markAsRead]);
+
   const send = () => {
     if (!input.trim()) return;
     setMessages((prev) => [...prev, { id: Date.now().toString(), text: input.trim(), isMe: true, time: 'Şimdi' }]);
     setInput('');
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin gerekli', 'Galeriye erişim için izin vermeniz gerekiyor.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const now = Date.now();
+      const newMessages: MessageItem[] = result.assets.map((asset, i) => ({
+        id: `${now}-${i}`,
+        imageUri: asset.uri,
+        isMe: true,
+        time: 'Şimdi',
+      }));
+      setMessages((prev) => [...prev, ...newMessages]);
+    }
   };
 
   const closeSheet = () => setSheetVisible(false);
@@ -83,6 +126,12 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     },
   ];
 
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <Screen>
       <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={closeSheet}>
@@ -90,7 +139,10 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeSheet} />
           <View style={[styles.sheetBox, { backgroundColor: colors.headerBg ?? '#2C1C2D', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }]}>
           <View style={[styles.sheetHandle, { backgroundColor: colors.textTertiary }]} />
-          <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.lg }]}>{route.params.name}</Text>
+          <View style={[styles.sheetHeader, { marginBottom: spacing.lg }]}>
+            <Avatar source={route.params.avatar} size="xl" showBorder />
+            <Text style={[typography.h4, { color: '#FFFFFF', marginTop: spacing.md }]}>{route.params.name}</Text>
+          </View>
           {sheetActions.map((action) => (
             <TouchableOpacity
               key={action.id}
@@ -136,8 +188,22 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               },
             ]}
           >
-            <Text style={[typography.bodySmall, { color: item.isMe ? '#FFF' : colors.text }]}>{item.text}</Text>
-            <Text style={[typography.label, { color: item.isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary, marginTop: 4 }]}>{item.time}</Text>
+            {item.imageUri ? (
+              <>
+                <Image source={{ uri: item.imageUri }} style={styles.messageImage} resizeMode="cover" />
+                <Text style={[typography.label, { color: item.isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary, marginTop: 4 }]}>{item.time}</Text>
+              </>
+            ) : item.voiceUri ? (
+              <>
+                <Text style={[typography.bodySmall, { color: item.isMe ? '#FFF' : colors.text }]}>🎤 Sesli mesaj {formatDuration(item.durationSeconds ?? 0)}</Text>
+                <Text style={[typography.label, { color: item.isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary, marginTop: 4 }]}>{item.time}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={[typography.bodySmall, { color: item.isMe ? '#FFF' : colors.text }]}>{item.text}</Text>
+                <Text style={[typography.label, { color: item.isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary, marginTop: 4 }]}>{item.time}</Text>
+              </>
+            )}
           </View>
         )}
         />
@@ -152,6 +218,9 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             returnKeyType="send"
             onSubmitEditing={send}
           />
+          <TouchableOpacity onPress={pickImage} style={[styles.galleryBtn, { marginLeft: spacing.sm }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Icon name="image-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={send} style={[styles.sendBtn, { backgroundColor: colors.primary }]}>
             <Icon name="send" size={20} color="#FFF" />
           </TouchableOpacity>
@@ -161,9 +230,13 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
+const IMAGE_SIZE = 200;
+
 const styles = StyleSheet.create({
   bubble: {},
+  messageImage: { width: IMAGE_SIZE, height: IMAGE_SIZE, borderRadius: 12 },
   inputRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1 },
+  galleryBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   input: { flex: 1, paddingHorizontal: 16, paddingVertical: 12 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   sheetOverlay: {
@@ -182,6 +255,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
+  },
+  sheetHeader: {
+    alignItems: 'center',
   },
   sheetRow: {
     flexDirection: 'row',

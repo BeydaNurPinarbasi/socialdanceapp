@@ -8,6 +8,8 @@ import { Poppins_300Light, Poppins_400Regular, Poppins_700Bold } from '@expo-goo
 import { ThemeProvider } from './src/theme';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { CartProvider } from './src/context/CartContext';
+import { MarketplaceProvider } from './src/context/MarketplaceContext';
+import { ChatProvider } from './src/context/ChatContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 export default function App() {
@@ -73,9 +75,13 @@ export default function App() {
         <ThemeProvider>
           <ProfileProvider>
             <CartProvider>
-              <NavigationContainer>
-                <RootNavigator initialRouteName="Auth" />
-              </NavigationContainer>
+              <MarketplaceProvider>
+                <ChatProvider>
+                  <NavigationContainer>
+                    <RootNavigator initialRouteName="Auth" />
+                  </NavigationContainer>
+                </ChatProvider>
+              </MarketplaceProvider>
             </CartProvider>
           </ProfileProvider>
         </ThemeProvider>

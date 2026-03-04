@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { CollapsingHeaderScrollView } from '../../components/layout/CollapsingHeaderScrollView';
 import { EventCard } from '../../components/domain/EventCard';
-import { FilterBar } from '../../components/domain/FilterBar';
 import { SearchBar } from '../../components/domain/SearchBar';
 import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
@@ -21,10 +21,14 @@ const filters = ['Tümü', 'Bugün', 'Bu Hafta', 'Bu Ay'];
 
 export const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const { colors, spacing, typography } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { colors, spacing, radius, typography } = useTheme();
   const [activeFilter, setActiveFilter] = useState('Tümü');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const { coords: userCoords } = useLocation();
+
+  const closeFilterSheet = () => setFilterSheetVisible(false);
 
   const filteredEvents = useMemo(() => {
     const now = new Date();
@@ -73,7 +77,7 @@ export const ExploreScreen: React.FC = () => {
     <Screen>
       <CollapsingHeaderScrollView
         headerProps={{
-          title: 'Dans Gecesi Keşfet',
+          title: 'Keşfet',
           showLogo: false,
           showBack: false,
           showMenu: true,
@@ -83,23 +87,33 @@ export const ExploreScreen: React.FC = () => {
         }}
         headerExtra={
           <View>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Etkinlik, mekan veya şehir ara"
-              backgroundColor="#482347"
-            />
-            <View style={{ marginTop: spacing.sm }}>
-              <FilterBar filters={filters} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+            <View style={styles.searchRow}>
+              <View style={{ flex: 1 }}>
+                <SearchBar
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Etkinlik, mekan veya şehir ara"
+                  backgroundColor="#482347"
+                />
+              </View>
+              <TouchableOpacity
+                onPress={() => setFilterSheetVisible(true)}
+                style={[styles.filterBtn, { backgroundColor: '#482347', borderRadius: radius.lg, marginLeft: spacing.md }]}
+                activeOpacity={0.8}
+              >
+                <Icon name="filter-variant" size={22} color="#FFFFFF" />
+                <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginLeft: spacing.sm }]}>Filtrele</Text>
+              </TouchableOpacity>
             </View>
           </View>
         }
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
       >
+        <View style={{ marginTop: -44 }}>
         <Text
           style={[
             typography.captionBold,
-            { color: colors.textSecondary, marginBottom: spacing.sm, marginTop: -spacing.md },
+            { color: colors.textSecondary, marginBottom: spacing.sm },
           ]}
         >
           {filteredEvents.length} Etkinlik Bulundu
@@ -133,7 +147,32 @@ export const ExploreScreen: React.FC = () => {
             <Button title="Filtreleri Temizle" onPress={() => setActiveFilter('Tümü')} variant="ghost" size="sm" style={{ marginTop: spacing.md }} />
           </View>
         )}
+        </View>
       </CollapsingHeaderScrollView>
+
+      <Modal visible={filterSheetVisible} transparent animationType="slide" onRequestClose={closeFilterSheet}>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFilterSheet} />
+          <View style={[styles.sheetBox, { backgroundColor: colors.headerBg ?? '#2C1C2D', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: insets.bottom + 24 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.textTertiary }]} />
+            <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.lg }]}>Zaman</Text>
+            {filters.map((f) => (
+              <TouchableOpacity
+                key={f}
+                onPress={() => {
+                  setActiveFilter(f);
+                  closeFilterSheet();
+                }}
+                style={[styles.sheetRow, { borderBottomColor: 'rgba(255,255,255,0.08)' }]}
+                activeOpacity={0.7}
+              >
+                <Text style={[typography.body, { color: activeFilter === f ? colors.primary : '#FFFFFF' }]}>{f}</Text>
+                {activeFilter === f && <Icon name="check" size={22} color={colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
 
       <View style={[styles.fab, { right: spacing.lg, bottom: 1 }]}>
         <TouchableOpacity
@@ -149,6 +188,31 @@ export const ExploreScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  searchRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheetBox: {
+    paddingTop: 12,
+    paddingHorizontal: 24,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
   fab: {
     position: 'absolute',
     zIndex: 10,

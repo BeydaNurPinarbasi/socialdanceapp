@@ -26,7 +26,7 @@ export type MainStackParamList = {
   NewChat: undefined;
   Marketplace: undefined;
   Cart: undefined;
-  AddProduct: undefined;
+  AddProduct: { productId?: string };
   ProductDetail: { id: string };
   Settings: undefined;
   EditProfile: undefined;
