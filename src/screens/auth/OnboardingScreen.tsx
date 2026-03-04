@@ -22,7 +22,7 @@ const IntroStepWelcome: React.FC<{ next: () => void }> = ({ next }) => {
     <View style={[styles.stepContainer, { paddingHorizontal: spacing.sm, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 0, marginTop: 116 }]}>
       <View style={{ alignItems: 'center', width: '100%' }}>
         <Image
-          source={require('../../../assets/social-dance-logo.png')}
+          source={require('../../../assets/social_dance.png')}
           style={styles.onboardingLogoStandalone}
           resizeMode="contain"
         />
@@ -61,7 +61,7 @@ const IntroStepAbout: React.FC<{ next: () => void }> = ({ next }) => {
     <View style={[styles.stepContainer, { paddingHorizontal: spacing.lg, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 0, marginTop: 110 }]}>
       <View style={{ alignItems: 'center', width: '100%' }}>
         <Image
-          source={require('../../../assets/social-dance-logo.png')}
+          source={require('../../../assets/social_dance.png')}
           style={styles.onboardingLogoStandalone}
           resizeMode="contain"
         />
@@ -103,7 +103,7 @@ const IntroStepLogin: React.FC<{ onSocialContinue: () => void; onEmailContinue: 
     <View style={[styles.stepContainer, { paddingHorizontal: spacing.lg, justifyContent: 'flex-start', alignItems: 'center', paddingTop: spacing.xxl }]}>
       <View style={{ alignItems: 'center', width: '100%' }}>
         <Image
-          source={require('../../../assets/social-dance-logo.png')}
+          source={require('../../../assets/social_dance.png')}
           style={styles.onboardingLogoStandalone}
           resizeMode="contain"
         />
