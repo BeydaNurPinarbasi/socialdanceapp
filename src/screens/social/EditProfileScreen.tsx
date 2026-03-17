@@ -10,6 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
 import { ConfirmModal } from '../../components/feedback/ConfirmModal';
+import { Chip } from '../../components/ui/Chip';
 
 export const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -24,9 +25,7 @@ export const EditProfileScreen: React.FC = () => {
   const [email, setEmail] = useState(profile.email);
   const [telefon, setTelefon] = useState('');
   const [sehir, setSehir] = useState('İstanbul');
-  const [favoriDans, setFavoriDans] = useState(
-    profile.favoriteDances && profile.favoriteDances.length > 0 ? profile.favoriteDances.join(', ') : '',
-  );
+  const [favoriteDances, setFavoriteDances] = useState<string[]>(profile.favoriteDances ?? []);
   const [alertModal, setAlertModal] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
@@ -37,10 +36,14 @@ export const EditProfileScreen: React.FC = () => {
     setHakkimda(profile.bio);
     setAvatarUri(profile.avatarUri);
     setEmail(profile.email);
-    setFavoriDans(
-      profile.favoriteDances && profile.favoriteDances.length > 0 ? profile.favoriteDances.join(', ') : '',
-    );
+    setFavoriteDances(profile.favoriteDances ?? []);
   }, [profile.displayName, profile.username, profile.bio, profile.avatarUri, profile.email, profile.favoriteDances]);
+
+  const DANCES = ['Salsa', 'Bachata', 'Hip-Hop', 'Tango', 'Kizomba', 'Swing', 'Zumba', 'Vals', 'Modern'] as const;
+
+  const toggleDance = (dance: string) => {
+    setFavoriteDances((prev) => (prev.includes(dance) ? prev.filter((d) => d !== dance) : [...prev, dance]));
+  };
 
   const openGalleryAndSetAvatar = () => {
     setTimeout(async () => {
@@ -91,17 +94,13 @@ export const EditProfileScreen: React.FC = () => {
   const handleSave = () => {
     const displayName = [ad.trim(), soyad.trim()].filter(Boolean).join(' ') || profile.displayName;
     const username = kullaniciAdi.trim().replace(/^@/, '') || profile.username;
-    const parsedFavoriteDances = favoriDans
-      .split(',')
-      .map((d) => d.trim())
-      .filter((d) => d.length > 0);
     updateProfile({
-      displayName: displayName || 'Kullanıcı',
-      username: username || profile.username,
+      displayName: displayName || '',
+      username: username || '',
       avatarUri,
-      bio: hakkimda.trim() || profile.bio,
-      email: email.trim() || profile.email,
-      favoriteDances: parsedFavoriteDances,
+      bio: hakkimda.trim() || '',
+      email: email.trim() || '',
+      favoriteDances,
     });
     navigation.goBack();
   };
@@ -242,15 +241,19 @@ export const EditProfileScreen: React.FC = () => {
           />
 
           <Text style={[typography.label, { color: '#FFFFFF', marginBottom: spacing.xs }]}>Favori dans türleri</Text>
-          <Input
-            value={favoriDans}
-            onChangeText={setFavoriDans}
-            placeholder="Örn: Salsa, Bachata, Tango"
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            containerStyle={{ marginBottom: spacing.xl }}
-            backgroundColor="#311831"
-            style={{ color: '#FFFFFF' }}
-          />
+          <View style={{ marginBottom: spacing.xl }}>
+            <View style={[styles.chipGrid, { marginTop: spacing.sm }]}>
+              {DANCES.map((dance) => (
+                <Chip
+                  key={dance}
+                  label={dance}
+                  selected={favoriteDances.includes(dance)}
+                  onPress={() => toggleDance(dance)}
+                  icon={favoriteDances.includes(dance) ? 'check' : undefined}
+                />
+              ))}
+            </View>
+          </View>
 
           <Button title="Kaydet" onPress={handleSave} fullWidth size="lg" />
         </ScrollView>
@@ -290,5 +293,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
     elevation: 10,
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
 });

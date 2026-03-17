@@ -9,6 +9,7 @@ import { useProfile } from '../context/ProfileContext';
 import { Icon, IconName } from '../components/ui/Icon';
 import { Avatar } from '../components/ui/Avatar';
 import { Divider } from '../components/ui/Divider';
+import { authService } from '../services/api/auth';
 
 interface MenuItem {
   label: string;
@@ -20,8 +21,8 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { label: 'Keşfet', icon: 'compass-outline', route: 'Explore' },
   { label: 'Okullar', icon: 'school-outline', route: 'Schools' },
-  { label: 'DanceQueen', icon: 'crown-outline', route: 'DanceQueen' },
-  { label: 'Dans Takip', icon: 'human-female-dance', route: 'DancerTrack' },
+  { label: 'DanceStar', icon: 'crown-outline', route: 'DanceStar' },
+  { label: 'DanceCircle', icon: 'human-female-dance', route: 'DanceCircle' },
   { label: 'Etkinlikler', icon: 'calendar-outline', route: 'Explore' },
   { label: 'Profil', icon: 'account-outline', route: 'Profile' },
   { label: 'Marketplace', icon: 'shopping-outline', route: 'Marketplace' },
@@ -36,7 +37,7 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = ({ navigation
 
   const handleNavigate = (item: MenuItem) => {
     navigation.closeDrawer();
-    const tabRoutes = ['Explore', 'Schools', 'DancerTrack', 'Favorites', 'Profile'];
+    const tabRoutes = ['Explore', 'Schools', 'DanceCircle', 'Favorites', 'Profile'];
     if (tabRoutes.includes(item.route)) {
       navigation.navigate('Main', {
         screen: 'MainTabs',
@@ -47,8 +48,9 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = ({ navigation
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     navigation.closeDrawer();
+    await authService.logout().catch(() => {});
     navigation.reset({
       index: 0,
       routes: [{ name: 'Auth' as never }],
@@ -65,8 +67,12 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = ({ navigation
             showBorder
           />
           <View style={{ marginTop: spacing.sm }}>
-            <Text style={[typography.h3, { color: colors.headerText }]} numberOfLines={1}>{profile.displayName}</Text>
-            <Text style={[typography.bodySmall, { color: colors.headerText, opacity: 0.8, marginTop: 2 }]} numberOfLines={1}>@{profile.username}</Text>
+            {profile.displayName ? (
+              <Text style={[typography.h3, { color: colors.headerText }]} numberOfLines={1}>{profile.displayName}</Text>
+            ) : null}
+            {profile.username ? (
+              <Text style={[typography.bodySmall, { color: colors.headerText, opacity: 0.8, marginTop: 2 }]} numberOfLines={1}>@{profile.username}</Text>
+            ) : null}
           </View>
         </View>
         <TouchableOpacity

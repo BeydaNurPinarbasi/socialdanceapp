@@ -14,7 +14,7 @@ export const SettingsPaymentsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { colors, spacing, typography, radius } = useTheme();
 
-  const [cardHolder, setCardHolder] = useState('Elif Yılmaz');
+  const [cardHolder, setCardHolder] = useState('');
   const [cardNumber, setCardNumber] = useState('4242424242424242');
   const [editCardVisible, setEditCardVisible] = useState(false);
 

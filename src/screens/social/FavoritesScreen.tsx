@@ -90,7 +90,7 @@ export const FavoritesScreen: React.FC = () => {
                   isPopular: event.isPopular,
                   attendees: event.attendees,
                   attendeeAvatars: event.attendeeAvatars,
-                  isDanceQueen: event.isDanceQueen,
+                  isDanceStar: event.isDanceStar,
                 }}
                 onPress={() => navigation.navigate('EventDetails', { id: String(event.id), fromFavorites: true })}
                 onFavoritePress={() => toggleFavorite(event.id as number)}
@@ -105,12 +105,12 @@ export const FavoritesScreen: React.FC = () => {
                   })
                 }
               />
-              {event.isDanceQueen && (
+              {event.isDanceStar && (
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('DanceQueen')}
+                  onPress={() => navigation.navigate('DanceStar')}
                   style={[styles.dqBtn, { backgroundColor: colors.purple, marginTop: spacing.sm }]}
                 >
-                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>DanceQueen 👑</Text>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>DanceStar ⭐</Text>
                 </TouchableOpacity>
               )}
             </View>

@@ -10,6 +10,7 @@ import { TabSwitch } from '../../components/domain/TabSwitch';
 import { UserListItem } from '../../components/domain/UserListItem';
 import { ConfirmModal } from '../../components/feedback/ConfirmModal';
 import { mockFollowing } from '../../constants/mockData';
+import { Icon } from '../../components/ui/Icon';
 
 const initialFollowers = [
   { id: 5, name: 'Zeynep Su', handle: '@zeynepsu', img: 'https://i.pravatar.cc/150?u=25' },
@@ -98,11 +99,33 @@ export const ProfileScreen: React.FC = () => {
             showBorder
           />
         </View>
-        <Text style={[typography.h3, { color: '#FFFFFF', marginTop: spacing.md }]}>{profile.displayName}</Text>
-        <Text style={[typography.bodySmall, { color: '#FFFFFF' }]}>@{profile.username}</Text>
-        <Text style={[typography.bodySmall, { color: '#9CA3AF', textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.xxl }]}>
-          {profile.bio}
-        </Text>
+        {profile.displayName ? (
+          <Text style={[typography.h3, { color: '#FFFFFF', marginTop: spacing.md }]}>{profile.displayName}</Text>
+        ) : null}
+        {profile.username ? (
+          <Text style={[typography.bodySmall, { color: '#FFFFFF' }]}>@{profile.username}</Text>
+        ) : null}
+        {profile.bio ? (
+          <Text style={[typography.bodySmall, { color: '#9CA3AF', textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.xxl }]}>
+            {profile.bio}
+          </Text>
+        ) : null}
+
+        <View style={{ width: '100%', paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
+          <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginBottom: spacing.sm }]}>Favori danslar</Text>
+          {profile.favoriteDances?.length ? (
+            <View style={styles.tagsRow}>
+              {profile.favoriteDances.map((dance) => (
+                <View key={dance} style={[styles.tag, { borderColor: 'rgba(255,255,255,0.12)' }]}>
+                  <Icon name="music" size={14} color={colors.primary} style={{ marginRight: 6 }} />
+                  <Text style={[typography.captionBold, { color: '#FFFFFF' }]}>{dance}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[typography.caption, { color: '#9CA3AF' }]}>Henüz seçmedin.</Text>
+          )}
+        </View>
 
         <TouchableOpacity
           onPress={() => (navigation.getParent() as any)?.navigate('EditProfile')}
@@ -193,4 +216,14 @@ const styles = StyleSheet.create({
   },
   statsRow: { flexDirection: 'row', alignItems: 'center', width: '90%' },
   statItem: { flex: 1, alignItems: 'center' },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    backgroundColor: '#311831',
+    borderRadius: 9999,
+  },
 });

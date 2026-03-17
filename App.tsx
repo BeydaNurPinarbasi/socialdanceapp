@@ -4,7 +4,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { useFonts } from '@expo-google-fonts/poppins/useFonts';
-import { Poppins_300Light, Poppins_400Regular, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import {
+  Poppins_300Light,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
 import { ThemeProvider } from './src/theme';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { CartProvider } from './src/context/CartContext';
@@ -14,9 +20,12 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 
 export default function App() {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const [initialRouteName, setInitialRouteName] = useState<'Auth' | 'App' | null>(null);
   const [fontsLoaded] = useFonts({
     Poppins_300Light,
     Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
     Poppins_700Bold,
   });
 
@@ -24,6 +33,30 @@ export default function App() {
     import('./src/services/notifications')
       .then((mod) => mod.setupNotificationHandler())
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    import('./src/services/storage')
+      .then(async ({ storage }) => {
+        const [isLoggedIn, accessToken, refreshToken] = await Promise.all([
+          storage.isLoggedIn(),
+          storage.getAccessToken(),
+          storage.getRefreshToken(),
+        ]);
+
+        if (!cancelled) {
+          setInitialRouteName(isLoggedIn || !!accessToken || !!refreshToken ? 'App' : 'Auth');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setInitialRouteName('Auth');
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -48,7 +81,7 @@ export default function App() {
     };
   }, [fontsLoaded]);
 
-  if (!fontsLoaded || isSplashVisible) {
+  if (!fontsLoaded || isSplashVisible || !initialRouteName) {
     return (
       <ImageBackground
         source={require('./assets/splash.png')}
@@ -78,7 +111,7 @@ export default function App() {
               <MarketplaceProvider>
                 <ChatProvider>
                   <NavigationContainer>
-                    <RootNavigator initialRouteName="Auth" />
+                    <RootNavigator initialRouteName={initialRouteName} />
                   </NavigationContainer>
                 </ChatProvider>
               </MarketplaceProvider>

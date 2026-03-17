@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Alert, View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
@@ -8,8 +8,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Icon } from '../../components/ui/Icon';
 import { AuthStackParamList } from '../../types/navigation';
-import { storage } from '../../services/storage';
 import { useProfile } from '../../context/ProfileContext';
+import { authService } from '../../services/api/auth';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SignUp'>;
 
@@ -34,6 +34,8 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordRepeat, setPasswordRepeat] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const requirementStatus = useMemo(() => requirements.map((r) => ({ ...r, met: r.check(password) })), [password]);
 
@@ -56,7 +58,9 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
     passwordRepeat === password;
 
   const handleSignUp = async () => {
-    if (!isFormValid) return;
+    if (!isFormValid || loading) return;
+    setLoading(true);
+    setError(null);
     const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
     const username = email.trim().split('@')[0] || 'kullanici';
     const profileToStore = {
@@ -65,11 +69,30 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
       avatarUri: null,
       bio: '',
       email: email.trim(),
+      favoriteDances: [],
+      otherInterests: '',
     };
-    await storage.setProfile(profileToStore);
-    // Profil context'ini anında güncelle, uygulamayı yeniden açmaya gerek kalmasın
-    setProfileFromStored(profileToStore);
-    navigation.replace('Onboarding', { startFromStep: 4 });
+    try {
+      const res = await authService.signUp({
+        email,
+        password,
+        displayName: profileToStore.displayName,
+        username,
+      });
+
+      if (res.needsEmailConfirmation) {
+        Alert.alert('E-posta dogrulamasi gerekli', 'Hesabin olusturuldu. Giris yapmadan once e-postandaki dogrulama linkine tikla.');
+        navigation.replace('EmailLogin');
+        return;
+      }
+
+      setProfileFromStored(profileToStore);
+      navigation.replace('Preferences');
+    } catch (e: any) {
+      setError(e?.message || 'Kayit olusturulamadi.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -157,12 +180,23 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                 ))}
               </View>
-              <Button title="Kayıt Ol" onPress={handleSignUp} fullWidth style={{ marginTop: spacing.xl }} disabled={!isFormValid} />
+              <Button
+                title={loading ? 'Kayit olusturuluyor...' : 'Kayıt Ol'}
+                onPress={handleSignUp}
+                fullWidth
+                style={{ marginTop: spacing.xl }}
+                disabled={!isFormValid || loading}
+              />
+              {error ? (
+                <Text style={[typography.bodySmall, { color: '#FCA5A5', marginTop: spacing.md, textAlign: 'center' }]}>
+                  {error}
+                </Text>
+              ) : null}
             </View>
 
             <View style={styles.loginRow}>
               <Text style={[typography.caption, { color: '#FFFFFF' }]}>Zaten hesabın var mı? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Onboarding', { startFromStep: 3 })}>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
                 <Text style={[typography.captionBold, { color: '#FFFFFF' }]}>Giriş Yap</Text>
               </TouchableOpacity>
             </View>

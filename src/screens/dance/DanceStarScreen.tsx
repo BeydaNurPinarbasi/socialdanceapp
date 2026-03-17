@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../types/navigation';
@@ -8,7 +8,6 @@ import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
 import { Card } from '../../components/ui/Card';
 import { Avatar } from '../../components/ui/Avatar';
-import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 
@@ -21,12 +20,12 @@ const mockAttendees = [
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-export const DanceQueenScreen: React.FC = () => {
+export const DanceStarScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors, spacing, typography } = useTheme();
   const [attendees, setAttendees] = useState(mockAttendees);
   const [seconds, setSeconds] = useState(300); // 5 min
-  const maxVotes = 1; // 1 kullanıcı 1 kez oy verebilir
+  const maxVotes = 1;
   const usedVotes = attendees.filter((a) => a.voted).length;
 
   useEffect(() => {
@@ -52,9 +51,20 @@ export const DanceQueenScreen: React.FC = () => {
 
   return (
     <Screen>
-      <Header title="DanceQueen" showBack />
+      <Header title="DanceStar" showBack />
 
-      <View style={[styles.timerBar, { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, backgroundColor: colors.headerBg, borderBottomWidth: 1, borderBottomColor: colors.borderLight }]}>
+      <View
+        style={[
+          styles.timerBar,
+          {
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            backgroundColor: colors.headerBg,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderLight,
+          },
+        ]}
+      >
         <View style={styles.timerRow}>
           <View style={[styles.timerBox, { backgroundColor: colors.surface, borderRadius: 12 }]}>
             <Text style={[typography.h2, { color: colors.text }]}>{String(m).padStart(2, '0')}</Text>
@@ -115,3 +125,4 @@ const styles = StyleSheet.create({
   attendeeRow: { flexDirection: 'row', alignItems: 'center' },
   voteBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 });
+

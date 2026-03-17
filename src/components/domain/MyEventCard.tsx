@@ -18,7 +18,7 @@ export interface MyEventCardData {
   isPopular?: boolean;
   attendees?: number;
   attendeeAvatars?: string[];
-  isDanceQueen?: boolean;
+  isDanceStar?: boolean;
 }
 
 interface MyEventCardProps {

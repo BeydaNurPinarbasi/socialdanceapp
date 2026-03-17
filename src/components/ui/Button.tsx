@@ -111,7 +111,14 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         <View style={styles.content}>
           {icon && <Icon name={icon} size={s.iconSize} color={variantStyles.iconColor} style={{ marginRight: spacing.sm }} />}
-          <Text style={[{ fontSize: s.fontSize, fontWeight: '700' }, variantStyles.text, textStyle]}>
+          <Text
+            style={[
+              size === 'sm' ? typography.buttonSmall : typography.button,
+              { fontSize: s.fontSize },
+              variantStyles.text,
+              textStyle,
+            ]}
+          >
             {title}
           </Text>
           {iconRight && <Icon name={iconRight} size={s.iconSize} color={variantStyles.iconColor} style={{ marginLeft: spacing.sm }} />}

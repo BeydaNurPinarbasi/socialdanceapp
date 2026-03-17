@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
-import { storage } from '../../services/storage';
 import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
 import { Icon } from '../../components/ui/Icon';
 import { Toggle } from '../../components/ui/Toggle';
 import { Button } from '../../components/ui/Button';
 import { MainStackParamList } from '../../types/navigation';
+import { useProfile } from '../../context/ProfileContext';
+import { authService } from '../../services/api/auth';
 
 type SettingsItem = {
   icon: string;
   iconBg: string;
   label: string;
+  value?: string;
   toggle?: boolean;
   screen?: keyof MainStackParamList;
 };
@@ -47,9 +49,12 @@ const settingsSections: { title: string; items: SettingsItem[] }[] = [
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { colors, spacing, radius, typography } = useTheme();
+  const { profile } = useProfile();
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [location, setLocation] = useState(true);
+
+  const favoriteDancesValue = profile.favoriteDances?.length ? profile.favoriteDances.join(', ') : '';
 
   const getIconColor = (bg: string) => {
     if (bg === 'primary') return colors.primary;
@@ -67,6 +72,45 @@ export const SettingsScreen: React.FC = () => {
       <Header title="Ayarlar" showBack />
 
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <View style={{ marginBottom: spacing.xl }}>
+          <Text style={[typography.label, { color: '#FFFFFF', marginLeft: spacing.sm, marginBottom: spacing.sm }]}>
+            Tercihler
+          </Text>
+          <View style={{ backgroundColor: '#311831', borderRadius: radius.xl, borderWidth: 1, borderColor: colors.cardBorder }}>
+            <View
+              style={[
+                styles.row,
+                {
+                  paddingVertical: spacing.lg,
+                  paddingLeft: spacing.xl,
+                  paddingRight: spacing.xl + 40,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.row}
+                activeOpacity={0.7}
+                onPress={() => (navigation as any).navigate('EditProfile')}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: getIconColor('primary') + '20' }]}>
+                  <Icon name="music" size={20} color={getIconColor('primary')} />
+                </View>
+                <View style={{ marginLeft: spacing.md, flex: 1 }}>
+                  <Text style={[typography.bodyMedium, { color: '#FFFFFF' }]}>Favori Danslar</Text>
+                  {favoriteDancesValue ? (
+                    <Text style={[typography.caption, { color: '#9CA3AF', marginTop: 2 }]} numberOfLines={1}>
+                      {favoriteDancesValue}
+                    </Text>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => (navigation as any).navigate('EditProfile')} hitSlop={8} style={styles.rightControl}>
+                <Icon name="chevron-right" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
         {settingsSections.map((section) => (
           <View key={section.title} style={{ marginBottom: spacing.xl }}>
             <Text style={[typography.label, { color: '#FFFFFF', marginLeft: spacing.sm, marginBottom: spacing.sm }]}>
@@ -100,7 +144,14 @@ export const SettingsScreen: React.FC = () => {
                       <View style={[styles.iconWrap, { backgroundColor: getIconColor(item.iconBg) + '20' }]}>
                         <Icon name={item.icon as any} size={20} color={getIconColor(item.iconBg)} />
                       </View>
-                      <Text style={[typography.bodyMedium, { color: '#FFFFFF', marginLeft: spacing.md, flex: 1 }]}>{item.label}</Text>
+                      <View style={{ marginLeft: spacing.md, flex: 1 }}>
+                        <Text style={[typography.bodyMedium, { color: '#FFFFFF' }]}>{item.label}</Text>
+                        {item.value ? (
+                          <Text style={[typography.caption, { color: '#9CA3AF', marginTop: 2 }]} numberOfLines={1}>
+                            {item.value}
+                          </Text>
+                        ) : null}
+                      </View>
                     </TouchableOpacity>
                     {hasToggle ? (
                       <View style={styles.rightControl}>
@@ -130,7 +181,7 @@ export const SettingsScreen: React.FC = () => {
         <Button
           title="Çıkış Yap"
           onPress={async () => {
-            await storage.setLoggedIn(false);
+            await authService.logout();
             (navigation.getParent() as any)?.getParent()?.reset({ index: 0, routes: [{ name: 'Auth' }] });
           }}
           variant="danger"

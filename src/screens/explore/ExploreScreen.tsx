@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,9 +26,19 @@ export const ExploreScreen: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState('Tümü');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { coords: userCoords } = useLocation();
 
   const closeFilterSheet = () => setFilterSheetVisible(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    // Burada ileride gerçek API'den etkinlikler çekildiğinde yenileme işlemi yapılabilir.
+    // Şimdilik sadece kısa bir gecikmeden sonra spinner'ı kapatıyoruz.
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 800);
+  }, []);
 
   const filteredEvents = useMemo(() => {
     const now = new Date();
@@ -108,6 +118,13 @@ export const ExploreScreen: React.FC = () => {
           </View>
         }
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
       >
         <View style={{ marginTop: -44 }}>
         <Text

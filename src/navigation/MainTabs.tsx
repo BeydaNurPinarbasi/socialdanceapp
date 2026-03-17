@@ -6,7 +6,7 @@ import { useTheme } from '../theme';
 import { Icon, IconName } from '../components/ui/Icon';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { SchoolsScreen } from '../screens/schools/SchoolsScreen';
-import { DancerTrackScreen } from '../screens/dance/DancerTrackScreen';
+import { DanceCircleScreen } from '../screens/dance/DanceCircleScreen';
 import { FavoritesScreen } from '../screens/social/FavoritesScreen';
 import { ProfileScreen } from '../screens/social/ProfileScreen';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,7 +18,7 @@ const tabDanceIcon = require('../../assets/tab-dance-icon.png');
 const tabIcons: Record<keyof MainTabsParamList, { active: IconName; inactive: IconName }> = {
   Explore: { active: 'compass', inactive: 'compass-outline' },
   Schools: { active: 'school', inactive: 'school-outline' },
-  DancerTrack: { active: 'human-female-dance', inactive: 'human-female-dance' },
+  DanceCircle: { active: 'human-female-dance', inactive: 'human-female-dance' },
   Favorites: { active: 'heart', inactive: 'heart-outline' },
   Profile: { active: 'account', inactive: 'account-outline' },
 };
@@ -26,7 +26,7 @@ const tabIcons: Record<keyof MainTabsParamList, { active: IconName; inactive: Ic
 const tabLabels: Record<keyof MainTabsParamList, string> = {
   Explore: 'Keşfet',
   Schools: 'Okullar',
-  DancerTrack: 'Dans Takip',
+  DanceCircle: 'DanceCircle',
   Favorites: 'Favoriler',
   Profile: 'Profil',
 };
@@ -62,7 +62,7 @@ export const MainTabs: React.FC = () => {
           const iconSet = tabIcons[route.name as keyof MainTabsParamList];
           const iconName = focused ? iconSet.active : iconSet.inactive;
 
-          if (route.name === 'DancerTrack') {
+          if (route.name === 'DanceCircle') {
             return (
               <View style={styles.centerTabContainer}>
                 <LinearGradient
@@ -86,7 +86,7 @@ export const MainTabs: React.FC = () => {
     >
       <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Schools" component={SchoolsScreen} />
-      <Tab.Screen name="DancerTrack" component={DancerTrackScreen} />
+      <Tab.Screen name="DanceCircle" component={DanceCircleScreen} />
       <Tab.Screen name="Favorites" component={FavoritesScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

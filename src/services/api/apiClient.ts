@@ -1,0 +1,118 @@
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly details?: unknown;
+
+  constructor(message: string, opts: { status: number; code?: string; details?: unknown }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = opts.status;
+    this.code = opts.code;
+    this.details = opts.details;
+  }
+}
+
+export function getSupabaseUrl(): string {
+  return (process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+}
+
+export function getSupabasePublishableKey(): string {
+  return (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '').trim();
+}
+
+export function hasSupabaseConfig(): boolean {
+  return !!getSupabaseUrl() && !!getSupabasePublishableKey();
+}
+
+async function safeReadText(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return '';
+  }
+}
+
+function extractErrorMessage(payload: unknown, fallback: string): { message: string; code?: string } {
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    const message =
+      (typeof record.msg === 'string' && record.msg) ||
+      (typeof record.message === 'string' && record.message) ||
+      (typeof record.error_description === 'string' && record.error_description) ||
+      (typeof record.error === 'string' && record.error) ||
+      fallback;
+    const code = typeof record.code === 'string' ? record.code : undefined;
+    return { message, code };
+  }
+
+  return { message: fallback };
+}
+
+export async function supabaseAuthRequest<T>(
+  path: string,
+  opts: {
+    method?: HttpMethod;
+    body?: unknown;
+    accessToken?: string | null;
+    timeoutMs?: number;
+  } = {},
+): Promise<T> {
+  const supabaseUrl = getSupabaseUrl();
+  const publishableKey = getSupabasePublishableKey();
+
+  if (!supabaseUrl || !publishableKey) {
+    throw new ApiError(
+      'Supabase ayarlari eksik. EXPO_PUBLIC_SUPABASE_URL ve EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY tanimlanmali.',
+      { status: 0 },
+    );
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 15000);
+  const headers: Record<string, string> = {
+    apikey: publishableKey,
+    Accept: 'application/json',
+  };
+
+  if (opts.body != null) headers['Content-Type'] = 'application/json';
+  if (opts.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
+
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1${path}`, {
+      method: opts.method ?? 'GET',
+      headers,
+      body: opts.body != null ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+
+    const raw = await safeReadText(res);
+    const contentType = res.headers.get('content-type') || '';
+    const parsed = contentType.includes('application/json') && raw
+      ? (() => {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined;
+
+    if (!res.ok) {
+      const { message, code } = extractErrorMessage(parsed ?? raw, raw || `Request failed (${res.status})`);
+      throw new ApiError(message, { status: res.status, code, details: parsed ?? raw });
+    }
+
+    if (res.status === 204 || !raw) return undefined as T;
+    return (parsed ?? raw) as T;
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new ApiError('Request timed out.', { status: 0, code: 'TIMEOUT' });
+    }
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(err?.message || 'Network error.', { status: 0, code: 'NETWORK_ERROR', details: err });
+  } finally {
+    clearTimeout(timeout);
+  }
+}

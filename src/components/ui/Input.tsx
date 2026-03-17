@@ -10,6 +10,8 @@ interface InputProps extends TextInputProps {
   rightIcon?: IconName;
   onRightIconPress?: () => void;
   containerStyle?: ViewStyle;
+  /** Tek satırlı input yüksekliği (varsayılan: 52) */
+  height?: number;
   borderColor?: string;
   /** Input kutusunun iç arka plan rengi (örn. #311831). transparent = sayfa rengiyle bütünleşik */
   backgroundColor?: string;
@@ -36,6 +38,7 @@ export const Input: React.FC<InputProps> = ({
   rightIcon,
   onRightIconPress,
   containerStyle,
+  height,
   borderColor: borderColorProp,
   backgroundColor: backgroundColorProp,
   labelColor: labelColorProp,
@@ -61,8 +64,9 @@ export const Input: React.FC<InputProps> = ({
   const isMultiline = multiline === true;
   const showIconInsideBorder = leftIcon && !leftIconWithLabel;
 
-  const containerHeight = isMultiline ? undefined : INPUT_HEIGHT;
-  const containerMinHeight = isMultiline ? 100 : INPUT_HEIGHT;
+  const singleLineHeight = height ?? INPUT_HEIGHT;
+  const containerHeight = isMultiline ? undefined : singleLineHeight;
+  const containerMinHeight = isMultiline ? 100 : singleLineHeight;
 
   return (
     <View style={containerStyle}>
@@ -140,6 +144,7 @@ export const Input: React.FC<InputProps> = ({
             {
               color: colors.text,
               flex: 1,
+              minHeight: isMultiline ? INPUT_HEIGHT : singleLineHeight,
               // iOS'ta yazmaya başlanınca metnin yukarı fırlamaması için
               // tek satırlı inputlarda hafif bir paddingTop veriyoruz
               ...(Platform.OS === 'ios' && !isMultiline ? { paddingTop: 6 } : null),

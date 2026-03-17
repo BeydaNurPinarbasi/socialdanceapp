@@ -10,11 +10,11 @@ export interface StoredProfile {
   otherInterests?: string;
 }
 
-const DEFAULT_PROFILE: StoredProfile = {
-  displayName: 'Elif Yılmaz',
-  username: 'elifyilmaz',
+export const DEFAULT_PROFILE: StoredProfile = {
+  displayName: '',
+  username: '',
   avatarUri: null,
-  bio: 'Salsa ve Bachata tutkunu. Yeni insanlarla tanışıp dans etmeyi seviyorum!',
+  bio: '',
   email: '',
   favoriteDances: [],
   otherInterests: '',
@@ -22,6 +22,8 @@ const DEFAULT_PROFILE: StoredProfile = {
 
 const KEYS = {
   USER_LOGGED_IN: '@socialdance/logged_in',
+  ACCESS_TOKEN: '@socialdance/access_token',
+  REFRESH_TOKEN: '@socialdance/refresh_token',
   USER_FAVORITES: '@socialdance/favorites',
   NOTIFICATIONS_ENABLED: '@socialdance/notifications_enabled',
   LOCATION_ENABLED: '@socialdance/location_enabled',
@@ -61,6 +63,32 @@ export const storage = {
     await this.setItem(KEYS.USER_LOGGED_IN, value);
   },
 
+  async getAccessToken(): Promise<string | null> {
+    const v = await this.getItem<string>(KEYS.ACCESS_TOKEN);
+    return typeof v === 'string' && v.length ? v : null;
+  },
+
+  async setAccessToken(token: string): Promise<void> {
+    await this.setItem(KEYS.ACCESS_TOKEN, token);
+  },
+
+  async clearAccessToken(): Promise<void> {
+    await this.removeItem(KEYS.ACCESS_TOKEN);
+  },
+
+  async getRefreshToken(): Promise<string | null> {
+    const v = await this.getItem<string>(KEYS.REFRESH_TOKEN);
+    return typeof v === 'string' && v.length ? v : null;
+  },
+
+  async setRefreshToken(token: string): Promise<void> {
+    await this.setItem(KEYS.REFRESH_TOKEN, token);
+  },
+
+  async clearRefreshToken(): Promise<void> {
+    await this.removeItem(KEYS.REFRESH_TOKEN);
+  },
+
   async getFavorites(): Promise<string[]> {
     const v = await this.getItem<string[]>(KEYS.USER_FAVORITES);
     return v || [];
@@ -93,5 +121,18 @@ export const storage = {
 
   async setProfile(profile: StoredProfile): Promise<void> {
     await this.setItem(KEYS.PROFILE, profile);
+  },
+
+  async clearProfile(): Promise<void> {
+    await this.removeItem(KEYS.PROFILE);
+  },
+
+  async logout(): Promise<void> {
+    await Promise.all([
+      this.setLoggedIn(false),
+      this.clearAccessToken(),
+      this.clearRefreshToken(),
+      this.clearProfile(),
+    ]);
   },
 };

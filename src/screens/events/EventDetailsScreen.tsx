@@ -247,12 +247,12 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => navigation.navigate('DanceQueen')}
+            onPress={() => navigation.navigate('DanceStar')}
             activeOpacity={0.8}
             style={[styles.dqBanner, { backgroundColor: colors.purpleAlpha, borderRadius: radius.xl, padding: spacing.lg, marginTop: spacing.lg }]}
           >
             <Icon name="crown" size={24} color={colors.purple} />
-            <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginLeft: spacing.md }]}>DanceQueen oylamasına katıl</Text>
+            <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginLeft: spacing.md }]}>DanceStar oylamasına katıl</Text>
             <Icon name="chevron-right" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
 

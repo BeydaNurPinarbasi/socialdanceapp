@@ -5,7 +5,7 @@ import { MainTabs } from './MainTabs';
 import { EventDetailsScreen } from '../screens/events/EventDetailsScreen';
 import { SchoolDetailsScreen } from '../screens/schools/SchoolDetailsScreen';
 import { ClassDetailsScreen } from '../screens/events/ClassDetailsScreen';
-import { DanceQueenScreen } from '../screens/dance/DanceQueenScreen';
+import { DanceStarScreen } from '../screens/dance/DanceStarScreen';
 import { EditEventScreen } from '../screens/events/EditEventScreen';
 import { EditClassScreen } from '../screens/dance/EditClassScreen';
 import { ChatListScreen } from '../screens/chat/ChatListScreen';
@@ -33,7 +33,7 @@ export const MainStack: React.FC = () => {
       <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
       <Stack.Screen name="SchoolDetails" component={SchoolDetailsScreen} />
       <Stack.Screen name="ClassDetails" component={ClassDetailsScreen} />
-      <Stack.Screen name="DanceQueen" component={DanceQueenScreen} />
+      <Stack.Screen name="DanceStar" component={DanceStarScreen} />
       <Stack.Screen name="EditEvent" component={EditEventScreen} />
       <Stack.Screen name="EditClass" component={EditClassScreen} />
       <Stack.Screen name="ChatList" component={ChatListScreen} />

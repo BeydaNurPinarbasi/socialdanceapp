@@ -1,6 +1,9 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
 
 export type AuthStackParamList = {
+  Login: undefined;
+  EmailLogin: undefined;
+  Preferences: undefined;
   SignUp: undefined;
   Onboarding: { startFromStep?: number } | undefined;
 };
@@ -8,7 +11,7 @@ export type AuthStackParamList = {
 export type MainTabsParamList = {
   Explore: undefined;
   Schools: { isMapView?: boolean } | undefined;
-  DancerTrack: undefined;
+  DanceCircle: undefined;
   Favorites: undefined;
   Profile: undefined;
 };
@@ -18,7 +21,7 @@ export type MainStackParamList = {
   EventDetails: { id: string; fromFavorites?: boolean };
   SchoolDetails: { id: string };
   ClassDetails: { id: string };
-  DanceQueen: undefined;
+  DanceStar: undefined;
   EditEvent: undefined;
   EditClass: { draftData?: any };
   ChatList: undefined;
