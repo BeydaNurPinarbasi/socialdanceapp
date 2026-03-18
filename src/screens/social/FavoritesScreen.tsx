@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { CollapsingHeaderScrollView } from '../../components/layout/CollapsingHeaderScrollView';
 import { MyEventCard } from '../../components/domain/MyEventCard';
-import { TabSwitch } from '../../components/domain/TabSwitch';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { mockFavoritesEvents } from '../../constants/mockData';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -13,10 +12,9 @@ import { MainStackParamList } from '../../types/navigation';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
-export const FavoritesScreen: React.FC = () => {
+export const MyEventsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors, spacing, typography } = useTheme();
-  const [activeTab, setActiveTab] = useState<'favorites' | 'history'>('favorites');
   const [events] = useState(mockFavoritesEvents);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(
     () => new Set(events.filter((e) => e.isFavorite).map((e) => e.id as number))
@@ -31,11 +29,7 @@ export const FavoritesScreen: React.FC = () => {
     });
   };
 
-  const filtered = events.filter((e) => {
-    if (activeTab === 'favorites' && !favoritedIds.has(e.id as number)) return false;
-    if (activeTab === 'history' && !e.isPast) return false;
-    return true;
-  });
+  const filtered = useMemo(() => events.filter((e) => e.isPast), [events]);
 
   const openDrawer = () => (navigation.getParent() as any)?.openDrawer?.();
 
@@ -51,22 +45,6 @@ export const FavoritesScreen: React.FC = () => {
           showNotification: true,
           onNotificationPress: () => (navigation.getParent() as any)?.navigate('Notifications'),
         }}
-        headerExtra={
-          <View>
-            <TabSwitch
-              tabs={[
-                { key: 'favorites', label: 'Favorilerim' },
-                { key: 'history', label: 'Geçmiş Etkinlikler' },
-              ]}
-              activeTab={activeTab}
-              onTabChange={(k) => setActiveTab(k as 'favorites' | 'history')}
-              containerBgColor="#341A32"
-              indicatorColor="#EE2AEE"
-              textColor="rgba(255,255,255,0.7)"
-              activeTextColor="#FFFFFF"
-            />
-          </View>
-        }
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
       >
         <View style={{ marginTop: -56 }}>
@@ -85,7 +63,7 @@ export const FavoritesScreen: React.FC = () => {
                   date: event.date,
                   day: event.day,
                   month: event.month,
-                  image: event.image ?? 'https://picsum.photos/seed/event/400/280',
+                    image: event.image ?? '',
                   isFavorite: favoritedIds.has(event.id as number),
                   isPopular: event.isPopular,
                   attendees: event.attendees,

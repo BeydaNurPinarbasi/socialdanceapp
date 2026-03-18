@@ -61,11 +61,17 @@ export const Avatar: React.FC<AvatarProps> = ({
               width: dimension,
               height: dimension,
               borderRadius: dimension / 2,
-              backgroundColor: colors.surfaceSecondary,
+              backgroundColor: colors.primaryAlpha30,
+              ...(showBorder
+                ? {
+                    borderWidth: size === 'xl' ? borders.heavy : borders.thick,
+                    borderColor: borderColor || colors.border,
+                  }
+                : {}),
             },
           ]}
         >
-          <Icon name="account" size={dimension * 0.6} color={colors.textTertiary} />
+          <Icon name="account" size={dimension * 0.6} color="#FFFFFF" />
         </View>
       )}
       {showOnline && (

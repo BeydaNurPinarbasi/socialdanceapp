@@ -108,6 +108,37 @@ export const SettingsScreen: React.FC = () => {
                 <Icon name="chevron-right" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
+            <View style={{ height: 1, backgroundColor: colors.borderLight, marginLeft: spacing.xl }} />
+            <View
+              style={[
+                styles.row,
+                {
+                  paddingVertical: spacing.lg,
+                  paddingLeft: spacing.xl,
+                  paddingRight: spacing.xl + 40,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.row}
+                activeOpacity={0.7}
+                onPress={() => (navigation as any).navigate('FavoriteSchools')}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: getIconColor('purple') + '20' }]}>
+                  <Icon name="heart" size={20} color={getIconColor('purple')} />
+                </View>
+                <View style={{ marginLeft: spacing.md, flex: 1 }}>
+                  <Text style={[typography.bodyMedium, { color: '#FFFFFF' }]}>Favoriler</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => (navigation as any).navigate('FavoriteSchools')}
+                hitSlop={8}
+                style={styles.rightControl}
+              >
+                <Icon name="chevron-right" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

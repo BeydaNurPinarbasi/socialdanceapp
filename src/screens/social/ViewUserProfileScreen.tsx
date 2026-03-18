@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
@@ -25,7 +25,15 @@ export const ViewUserProfileScreen: React.FC<Props> = ({ route, navigation }) =>
   const { userId, name, username, avatar, bio } = route.params;
   const [isFollowing, setIsFollowing] = useState(false);
   const [stats, setStats] = useState(INITIAL_STATS);
+  const [refreshing, setRefreshing] = useState(false);
   const displayBio = bio != null && bio !== '' ? bio : 'Bu kullanıcı henüz bir şey yazmamış.';
+
+  const onRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    // This screen is currently mock-driven; refresh is best-effort UX.
+    setTimeout(() => setRefreshing(false), 600);
+  };
 
   const handleFollowToggle = () => {
     setIsFollowing((v) => {
@@ -41,6 +49,16 @@ export const ViewUserProfileScreen: React.FC<Props> = ({ route, navigation }) =>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingHorizontal: spacing.lg, paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor="rgba(0,0,0,0.25)"
+            progressViewOffset={80}
+          />
+        }
       >
         <View style={styles.topSection}>
           <View style={[styles.avatarRing, { borderColor: colors.primary }]}>

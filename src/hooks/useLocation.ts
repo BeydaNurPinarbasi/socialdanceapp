@@ -40,9 +40,17 @@ export function useLocation(): {
     let cancelled = false;
     (async () => {
       try {
-        const { status } = await Location.getForegroundPermissionsAsync();
+        const existing = await Location.getForegroundPermissionsAsync();
+        const { status } =
+          existing.status === 'granted'
+            ? existing
+            : await Location.requestForegroundPermissionsAsync();
+
         if (status !== 'granted') {
-          if (!cancelled) setCoords(null);
+          if (!cancelled) {
+            setCoords(null);
+            setError('Konum izni verilmedi');
+          }
           return;
         }
         const position = await Location.getCurrentPositionAsync({

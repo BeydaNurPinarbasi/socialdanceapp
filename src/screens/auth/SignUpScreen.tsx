@@ -81,6 +81,8 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
       });
 
       if (res.needsEmailConfirmation) {
+        // Store entered profile locally so Edit Profile can prefill even before first login.
+        setProfileFromStored(profileToStore);
         navigation.replace('EmailVerification', { email: email.trim() });
         return;
       }

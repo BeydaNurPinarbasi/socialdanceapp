@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, TextInput, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useProfile } from '../../context/ProfileContext';
@@ -14,7 +14,7 @@ import { Chip } from '../../components/ui/Chip';
 export const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const { colors, spacing, typography, radius } = useTheme();
-  const { profile, updateProfile } = useProfile();
+  const { profile, updateProfile, refreshProfile } = useProfile();
   const nameParts = profile.displayName.trim().split(/\s+/);
   const [avatarUri, setAvatarUri] = useState<string | null>(profile.avatarUri);
   const [ad, setAd] = useState(nameParts[0] ?? '');
@@ -27,6 +27,7 @@ export const EditProfileScreen: React.FC = () => {
   const [favoriteDances, setFavoriteDances] = useState<string[]>(profile.favoriteDances ?? []);
   const [alertModal, setAlertModal] = useState<{ title: string; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const parts = profile.displayName.trim().split(/\s+/);
@@ -116,6 +117,18 @@ export const EditProfileScreen: React.FC = () => {
     }
   };
 
+  const onRefresh = async () => {
+    if (refreshing || saving) return;
+    setRefreshing(true);
+    try {
+      await refreshProfile();
+    } catch {
+      // ignore; keep current form values
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <Screen>
       <ConfirmModal
@@ -137,6 +150,16 @@ export const EditProfileScreen: React.FC = () => {
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+              progressBackgroundColor="rgba(0,0,0,0.25)"
+              progressViewOffset={60}
+            />
+          }
         >
           <TouchableOpacity
             onPress={openGalleryAndSetAvatar}

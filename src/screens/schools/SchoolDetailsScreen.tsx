@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Share, Image } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Share, Image, Linking, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
@@ -9,7 +9,10 @@ import { Button } from '../../components/ui/Button';
 import { Icon } from '../../components/ui/Icon';
 import { TabSwitch } from '../../components/domain/TabSwitch';
 import { MainStackParamList } from '../../types/navigation';
-import { mockSchools } from '../../constants/mockData';
+import { LoadingSpinner } from '../../components/feedback/LoadingSpinner';
+import { EmptyState } from '../../components/feedback/EmptyState';
+import { getSchoolById } from '../../services/api/schools';
+import { addFavoriteSchool, isSchoolFavorited, removeFavoriteSchool } from '../../services/api/favorites';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'SchoolDetails'>;
 
@@ -20,7 +23,9 @@ const defaultSchool = {
   image: 'https://picsum.photos/seed/salsa1/400/280',
   rating: 4.8,
   ratingCount: 124,
-  description: 'İstanbul\'un en köklü salsa ve Latin dans okullarından biri. Başlangıçtan ileri seviyeye grup dersleri ve özel ders imkânı.',
+  description: '',
+  phone: undefined as string | undefined,
+  website: undefined as string | undefined,
   classes: [
     { id: 'c1', title: 'Başlangıç Salsa', time: '19:00', day: 'Pazartesi', level: 'Başlangıç' },
     { id: 'c2', title: 'Orta Seviye Bachata', time: '20:30', day: 'Çarşamba', level: 'Orta' },
@@ -30,28 +35,91 @@ const defaultSchool = {
   ],
 };
 
+type SchoolDetailsVm = typeof defaultSchool & {
+  phone?: string;
+  website?: string;
+};
+
 export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('schedule');
   const [isFavorite, setIsFavorite] = useState(false);
-  const schoolFromList = mockSchools.find((s) => s.id === route.params.id);
-  const mockSchool = {
-    ...defaultSchool,
-    ...schoolFromList,
-    name: schoolFromList?.name ?? defaultSchool.name,
-    location: schoolFromList?.location ?? defaultSchool.location,
-    image: schoolFromList?.image ?? defaultSchool.image,
-    rating: schoolFromList?.rating ?? defaultSchool.rating,
-    ratingCount: schoolFromList?.ratingCount ?? defaultSchool.ratingCount,
-    classes: defaultSchool.classes,
-    events: defaultSchool.events,
-  };
+  const [school, setSchool] = useState<SchoolDetailsVm | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const fav = await isSchoolFavorited(route.params.id);
+        if (!cancelled) setIsFavorite(fav);
+      } catch {
+        if (!cancelled) setIsFavorite(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    (async () => {
+      try {
+        const row = await getSchoolById(route.params.id);
+        if (cancelled) return;
+        if (!row) {
+          setError('Okul bulunamadı');
+          setSchool(null);
+          return;
+        }
+
+        const location =
+          [row.district, row.city].filter(Boolean).join(', ') ||
+          row.address ||
+          defaultSchool.location;
+        const image =
+          row.image_url ||
+          `https://picsum.photos/seed/${encodeURIComponent(row.name)}/700/500`;
+        const description = (row as any).snippet ? String((row as any).snippet).trim() : '';
+
+        setSchool({
+          ...defaultSchool,
+          id: row.id,
+          name: row.name,
+          location,
+          image,
+          rating: typeof row.rating === 'number' && Number.isFinite(row.rating) ? row.rating : defaultSchool.rating,
+          ratingCount: typeof row.review_count === 'number' && Number.isFinite(row.review_count) ? row.review_count : defaultSchool.ratingCount,
+          description,
+          phone: row.telephone || undefined,
+          website: row.website || undefined,
+          classes: defaultSchool.classes,
+          events: defaultSchool.events,
+        });
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Okul yüklenemedi');
+        setSchool(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params.id]);
+
+  const currentSchool: SchoolDetailsVm = useMemo(() => school ?? defaultSchool, [school]);
 
   const handleShare = () => {
     Share.share({
-      message: `${mockSchool.name}\n${mockSchool.location}\n⭐ ${mockSchool.rating} (${mockSchool.ratingCount} değerlendirme)`,
-      title: mockSchool.name,
+      message: `${currentSchool.name}\n${currentSchool.location}\n⭐ ${currentSchool.rating} (${currentSchool.ratingCount} değerlendirme)`,
+      title: currentSchool.name,
     }).catch(() => {});
   };
 
@@ -65,7 +133,17 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
         <Icon name="share-variant" size={22} color="#FFFFFF" />
       </TouchableOpacity>
       <TouchableOpacity
-        onPress={() => setIsFavorite((v) => !v)}
+        onPress={async () => {
+          const next = !isFavorite;
+          setIsFavorite(next);
+          try {
+            if (next) await addFavoriteSchool(route.params.id);
+            else await removeFavoriteSchool(route.params.id);
+          } catch (e: any) {
+            setIsFavorite(!next);
+            Alert.alert('Favorilere eklenemedi', e?.message || 'Lütfen tekrar deneyin.');
+          }
+        }}
         style={[styles.headerOverlayBtn, { borderRadius: radius.full, marginTop: 8 }]}
         activeOpacity={0.7}
       >
@@ -79,34 +157,56 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
     { key: 'events', label: 'Etkinlikler' },
   ];
 
+  const handleContact = () => {
+    const phone = currentSchool.phone ? String(currentSchool.phone).replace(/[^\d+]/g, '') : '';
+    const website = currentSchool.website ? String(currentSchool.website).trim() : '';
+
+    if (phone) {
+      Linking.openURL(`tel:${phone}`).catch(() => {});
+      return;
+    }
+    if (website) {
+      const url = website.startsWith('http') ? website : `https://${website}`;
+      Linking.openURL(url).catch(() => {});
+    }
+  };
+
   return (
     <Screen edges={[]}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroWrap}>
-          <Image source={{ uri: mockSchool.image }} style={styles.heroImage} />
-          <View style={[styles.heroGradient, { backgroundColor: 'transparent' }]} />
+      {loading ? (
+        <LoadingSpinner fullScreen message="Okul yükleniyor..." />
+      ) : error ? (
+        <View style={{ paddingTop: insets.top }}>
+          <EmptyState icon="school-outline" title="Okul yüklenemedi" subtitle={error} />
         </View>
+      ) : (
+        <>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.heroWrap}>
+              <Image source={{ uri: currentSchool.image }} style={styles.heroImage} />
+              <View style={[styles.heroGradient, { backgroundColor: 'transparent' }]} />
+            </View>
 
-        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}>
-          <Text style={[typography.h3, { color: '#FFFFFF' }]}>{mockSchool.name}</Text>
-          <View style={[styles.row, { marginTop: spacing.sm }]}>
-            <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
-              <Icon name="map-marker-outline" size={18} color={colors.primary} />
-            </View>
-            <Text style={[typography.bodySmall, { color: 'rgba(255,255,255,0.85)', marginLeft: spacing.sm }]}>{mockSchool.location}</Text>
-          </View>
-          <View style={[styles.row, { marginTop: spacing.sm }]}>
-            <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
-              <Icon name="star" size={18} color={colors.primary} />
-            </View>
-            <Text style={[typography.bodySmall, { color: 'rgba(255,255,255,0.85)', marginLeft: spacing.sm }]}>
-              {mockSchool.rating} • {mockSchool.ratingCount} değerlendirme
-            </Text>
-          </View>
+            <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}>
+              <Text style={[typography.h3, { color: '#FFFFFF' }]}>{currentSchool.name}</Text>
+              <View style={[styles.row, { marginTop: spacing.sm }]}>
+                <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
+                  <Icon name="map-marker-outline" size={18} color={colors.primary} />
+                </View>
+                <Text style={[typography.bodySmall, { color: 'rgba(255,255,255,0.85)', marginLeft: spacing.sm }]}>{currentSchool.location}</Text>
+              </View>
+              <View style={[styles.row, { marginTop: spacing.sm }]}>
+                <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
+                  <Icon name="star" size={18} color={colors.primary} />
+                </View>
+                <Text style={[typography.bodySmall, { color: 'rgba(255,255,255,0.85)', marginLeft: spacing.sm }]}>
+                  {currentSchool.rating} • {currentSchool.ratingCount} değerlendirme
+                </Text>
+              </View>
 
           <View style={{ marginTop: spacing.xl }}>
             <TabSwitch
@@ -123,7 +223,7 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {activeTab === 'schedule' && (
             <View style={{ marginTop: spacing.lg, gap: spacing.md }}>
-              {mockSchool.classes.map((c) => (
+              {currentSchool.classes.map((c: (typeof defaultSchool.classes)[number]) => (
                 <TouchableOpacity
                   key={c.id}
                   onPress={() => navigation.navigate('ClassDetails', { id: c.id })}
@@ -147,7 +247,7 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {activeTab === 'events' && (
             <View style={{ marginTop: spacing.lg, gap: spacing.md }}>
-              {mockSchool.events.map((e) => (
+              {currentSchool.events.map((e: (typeof defaultSchool.events)[number]) => (
                 <TouchableOpacity
                   key={e.id}
                   onPress={() => navigation.navigate('EventDetails', { id: e.id })}
@@ -167,28 +267,35 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
 
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginTop: spacing.xl }} />
-          <View style={{ marginTop: spacing.lg }}>
-            <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.sm }]}>Hakkında</Text>
-            <Text style={[typography.body, { color: 'rgba(255,255,255,0.85)', lineHeight: 22 }]}>
-              {mockSchool.description}
-            </Text>
-          </View>
+          {Boolean(currentSchool.description && String(currentSchool.description).trim()) && (
+            <>
+              <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginTop: spacing.xl }} />
+              <View style={{ marginTop: spacing.lg }}>
+                <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.sm }]}>Hakkında</Text>
+                <Text style={[typography.body, { color: 'rgba(255,255,255,0.85)', lineHeight: 22 }]}>
+                  {currentSchool.description}
+                </Text>
+              </View>
+            </>
+          )}
 
           <View style={{ flex: 1, minHeight: 24 }} />
           <View style={[styles.bottomBar, { backgroundColor: colors.headerBg, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg }]}>
             <Button
               title="İletişime Geç"
-              onPress={() => {}}
+              onPress={handleContact}
+              disabled={!currentSchool.phone && !currentSchool.website}
               fullWidth
               style={{ borderRadius: 50 }}
             />
           </View>
-        </View>
-      </ScrollView>
-      <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <Header title="" showBack rightComponent={headerRight} transparent backButtonOverlay alignTop />
-      </View>
+            </View>
+          </ScrollView>
+          <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
+            <Header title="" showBack rightComponent={headerRight} transparent backButtonOverlay alignTop />
+          </View>
+        </>
+      )}
     </Screen>
   );
 };

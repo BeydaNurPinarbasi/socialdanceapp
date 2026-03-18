@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { useProfile } from '../../context/ProfileContext';
 import { Screen } from '../../components/layout/Screen';
@@ -9,29 +10,57 @@ import { Avatar } from '../../components/ui/Avatar';
 import { TabSwitch } from '../../components/domain/TabSwitch';
 import { UserListItem } from '../../components/domain/UserListItem';
 import { ConfirmModal } from '../../components/feedback/ConfirmModal';
-import { mockFollowing } from '../../constants/mockData';
 import { Icon } from '../../components/ui/Icon';
-
-const initialFollowers = [
-  { id: 5, name: 'Zeynep Su', handle: '@zeynepsu', img: 'https://i.pravatar.cc/150?u=25' },
-  { id: 6, name: 'Burak Öz', handle: '@burakoz', img: 'https://i.pravatar.cc/150?u=26' },
-];
-const initialRequests = [{ id: 7, name: 'Gizem Ak', handle: '@gizemak', img: 'https://i.pravatar.cc/150?u=27' }];
+import { followService } from '../../services/api/follows';
 
 type UserItem = { id: number; name: string; handle: string; img: string };
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const { colors, spacing, typography } = useTheme();
-  const { profile, avatarSource } = useProfile();
+  const insets = useSafeAreaInsets();
+  const { profile, avatarSource, refreshProfile } = useProfile();
   const [activeTab, setActiveTab] = useState<'following' | 'followers' | 'requests'>('following');
   const [dancedCount] = useState(42);
   const [unfollowedIds, setUnfollowedIds] = useState<Set<number>>(new Set());
   const [confirmModal, setConfirmModal] = useState<{ userId: number; userName: string } | null>(null);
-  const [followersList, setFollowersList] = useState<UserItem[]>(initialFollowers);
-  const [requestsList, setRequestsList] = useState<UserItem[]>(initialRequests);
+  const [followingList, setFollowingList] = useState<UserItem[]>([]);
+  const [followersList, setFollowersList] = useState<UserItem[]>([]);
+  const [requestsList, setRequestsList] = useState<UserItem[]>([]);
+  const [followCounts, setFollowCounts] = useState<{ following: number; followers: number }>({ following: 0, followers: 0 });
+  const [refreshing, setRefreshing] = useState(false);
 
   const openDrawer = () => (navigation.getParent() as any)?.openDrawer?.();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const counts = await followService.getMyFollowCounts();
+        if (!cancelled) setFollowCounts({ following: counts.following, followers: counts.followers });
+      } catch {
+        // keep defaults; profile screen can still render without counts
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refreshProfile(),
+        followService.getMyFollowCounts().then((counts) => setFollowCounts({ following: counts.following, followers: counts.followers })),
+      ]);
+    } catch {
+      // ignore: UI already shows cached profile; refresh is best-effort
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleUnfollowPress = (userId: number, userName: string) => {
     setConfirmModal({ userId, userName });
@@ -58,7 +87,7 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const getList = () => {
-    if (activeTab === 'following') return mockFollowing;
+    if (activeTab === 'following') return followingList;
     if (activeTab === 'followers') return followersList;
     return requestsList;
   };
@@ -91,6 +120,22 @@ export const ProfileScreen: React.FC = () => {
           onRightPress: () => (navigation.getParent() as any)?.navigate('Settings'),
         }}
         contentContainerStyle={{ alignItems: 'center', paddingBottom: 100 }}
+        // Enable pull-to-refresh visibility (Android needs overscroll).
+        overScrollMode={Platform.OS === 'android' ? 'always' : 'auto'}
+        // iOS: allow pull even when content is short.
+        alwaysBounceVertical
+        bounces
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor="rgba(0,0,0,0.25)"
+            // Keep spinner below the absolute header.
+            progressViewOffset={insets.top + 60 + 12}
+          />
+        }
       >
         <View style={[styles.avatarRing, { borderColor: colors.primary }]}>
           <Avatar
@@ -137,11 +182,11 @@ export const ProfileScreen: React.FC = () => {
 
         <View style={[styles.statsRow, { backgroundColor: '#311831', borderRadius: 50, padding: spacing.lg, marginTop: spacing.md, borderWidth: 0.5, borderColor: '#9CA3AF' }]}>
           <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('following')}>
-            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{mockFollowing.length - unfollowedIds.size}</Text>
+            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followCounts.following}</Text>
             <Text style={[typography.label, { color: '#FFFFFF' }]}>Takip Edilen</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('followers')}>
-            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followersList.length}</Text>
+            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followCounts.followers}</Text>
             <Text style={[typography.label, { color: '#FFFFFF' }]}>Takipçi</Text>
           </TouchableOpacity>
           <View style={styles.statItem}>

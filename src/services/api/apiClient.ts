@@ -1,3 +1,5 @@
+import { storage } from '../storage';
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export class ApiError extends Error {
@@ -48,6 +50,53 @@ function extractErrorMessage(payload: unknown, fallback: string): { message: str
   }
 
   return { message: fallback };
+}
+
+type RefreshTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+};
+
+function isJwtExpiredError(err: ApiError): boolean {
+  const msg = (err.message || '').toLowerCase();
+  const code = (err.code || '').toLowerCase();
+  return (
+    msg.includes('jwt expired') ||
+    msg.includes('expired jwt') ||
+    msg.includes('token is expired') ||
+    code.includes('jwt') ||
+    code.includes('expired')
+  );
+}
+
+async function tryRefreshAccessToken(): Promise<string | null> {
+  const refreshToken = await storage.getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const res = await supabaseAuthRequest<RefreshTokenResponse>('/token?grant_type=refresh_token', {
+      method: 'POST',
+      body: { refresh_token: refreshToken },
+    });
+
+    const nextAccess = res.access_token;
+    const nextRefresh = res.refresh_token;
+    if (!nextAccess || !nextRefresh) return null;
+
+    await Promise.all([
+      storage.setAccessToken(nextAccess),
+      storage.setRefreshToken(nextRefresh),
+      storage.setLoggedIn(true),
+    ]);
+
+    return nextAccess;
+  } catch {
+    return null;
+  }
+}
+
+async function expireSession(): Promise<void> {
+  await storage.logout();
 }
 
 export async function supabaseAuthRequest<T>(
@@ -125,6 +174,7 @@ export async function supabaseRestRequest<T>(
     accessToken?: string | null;
     headers?: Record<string, string | undefined>;
     timeoutMs?: number;
+    _retryOnExpiredJwt?: boolean;
   } = {},
 ): Promise<T> {
   const supabaseUrl = getSupabaseUrl();
@@ -173,7 +223,30 @@ export async function supabaseRestRequest<T>(
 
     if (!res.ok) {
       const { message, code } = extractErrorMessage(parsed ?? raw, raw || `Request failed (${res.status})`);
-      throw new ApiError(message, { status: res.status, code, details: parsed ?? raw });
+      const apiErr = new ApiError(message, { status: res.status, code, details: parsed ?? raw });
+
+      const allowRetry = opts._retryOnExpiredJwt ?? true;
+      const canRetry = allowRetry && apiErr.status === 401 && isJwtExpiredError(apiErr);
+
+      if (canRetry) {
+        const nextAccess = await tryRefreshAccessToken();
+        if (nextAccess) {
+          return await supabaseRestRequest<T>(path, {
+            ...opts,
+            accessToken: nextAccess,
+            _retryOnExpiredJwt: false,
+          });
+        }
+
+        await expireSession();
+        throw new ApiError('Oturum süreniz doldu. Lütfen tekrar giriş yapın.', {
+          status: 401,
+          code: 'SESSION_EXPIRED',
+          details: apiErr.details,
+        });
+      }
+
+      throw apiErr;
     }
 
     if (res.status === 204 || !raw) return undefined as T;

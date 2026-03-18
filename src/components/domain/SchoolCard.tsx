@@ -20,6 +20,7 @@ export const SchoolCard: React.FC<SchoolCardProps> = ({ school, onPress, cardBac
   const textColor = isDark ? '#FFFFFF' : colors.text;
   const textSecondaryColor = isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary;
   const textTertiaryColor = isDark ? 'rgba(255,255,255,0.6)' : colors.textTertiary;
+  const hasImage = Boolean(school.image && school.image.trim().length > 0);
 
   return (
     <View
@@ -36,13 +37,28 @@ export const SchoolCard: React.FC<SchoolCardProps> = ({ school, onPress, cardBac
     >
       <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.touchableArea}>
         <View style={styles.imageWrapper}>
-          <Image
-            source={{ uri: school.image }}
-            style={[styles.image, { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }]}
-            contentFit="cover"
-            placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-            transition={200}
-          />
+          {hasImage ? (
+            <Image
+              source={{ uri: school.image }}
+              style={[styles.image, { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }]}
+              contentFit="cover"
+              placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+              transition={200}
+            />
+          ) : (
+            <View
+              style={[
+                styles.imagePlaceholder,
+                {
+                  borderTopLeftRadius: radius.xl,
+                  borderTopRightRadius: radius.xl,
+                  backgroundColor: isDark ? 'rgba(238,43,238,0.12)' : colors.primaryAlpha10,
+                },
+              ]}
+            >
+              <Icon name="school-outline" size={34} color={isDark ? '#EE2AEE' : colors.primary} />
+            </View>
+          )}
         </View>
         <View style={{ padding: spacing.md }}>
           <View style={[styles.rowBetween, { marginBottom: 0 }]}>
@@ -52,7 +68,8 @@ export const SchoolCard: React.FC<SchoolCardProps> = ({ school, onPress, cardBac
         <View style={[styles.row, { marginTop: spacing.xs }]}>
           <Icon name="map-marker-outline" size={14} color={isDark ? '#EE2AEE' : colors.textSecondary} />
           <Text style={[typography.caption, { color: textSecondaryColor, marginLeft: 4, flex: 1 }]} numberOfLines={1}>
-            {school.location} • {school.distance}
+            {school.location}
+            {school.distance ? ` • ${school.distance}` : ''}
           </Text>
         </View>
         <View style={[styles.rowBetween, { marginTop: spacing.sm }]}>
@@ -112,6 +129,12 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: 140,
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   row: {
     flexDirection: 'row',

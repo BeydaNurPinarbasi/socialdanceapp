@@ -123,6 +123,9 @@ export const ExploreScreen: React.FC = () => {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor="rgba(0,0,0,0.25)"
+            progressViewOffset={80}
           />
         }
       >

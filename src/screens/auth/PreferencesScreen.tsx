@@ -42,7 +42,19 @@ export const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
       });
       (navigation.getParent() as any)?.reset({ index: 0, routes: [{ name: 'App' }] });
     } catch (e: any) {
-      setError(e?.message || 'Tercihleriniz kaydedilemedi. Lütfen tekrar deneyiniz.');
+      const msg = String(e?.message || '');
+      const isNetwork =
+        /network request failed/i.test(msg) ||
+        /network error/i.test(msg) ||
+        /failed to fetch/i.test(msg);
+
+      // Tercihler local'e yazıldığı için network hatasında kullanıcıyı bloklamıyoruz.
+      if (isNetwork) {
+        (navigation.getParent() as any)?.reset({ index: 0, routes: [{ name: 'App' }] });
+        return;
+      }
+
+      setError(msg || 'Tercihleriniz kaydedilemedi. Lütfen tekrar deneyiniz.');
     } finally {
       setSaving(false);
     }

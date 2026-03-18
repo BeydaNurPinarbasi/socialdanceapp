@@ -23,6 +23,8 @@ import { SettingsPaymentsScreen } from '../screens/social/SettingsPaymentsScreen
 import { SettingsHelpScreen } from '../screens/social/SettingsHelpScreen';
 import { SettingsAboutScreen } from '../screens/social/SettingsAboutScreen';
 import { ViewUserProfileScreen } from '../screens/social/ViewUserProfileScreen';
+import { FavoriteSchoolsScreen } from '../screens/social/FavoriteSchoolsScreen';
+import { FavoritesHubScreen } from '../screens/social/FavoritesHubScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -32,6 +34,8 @@ export const MainStack: React.FC = () => {
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
       <Stack.Screen name="SchoolDetails" component={SchoolDetailsScreen} />
+      <Stack.Screen name="FavoriteSchools" component={FavoriteSchoolsScreen} />
+      <Stack.Screen name="FavoritesHub" component={FavoritesHubScreen} />
       <Stack.Screen name="ClassDetails" component={ClassDetailsScreen} />
       <Stack.Screen name="DanceStar" component={DanceStarScreen} />
       <Stack.Screen name="EditEvent" component={EditEventScreen} />

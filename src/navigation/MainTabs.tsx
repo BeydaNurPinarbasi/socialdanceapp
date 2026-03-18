@@ -7,7 +7,7 @@ import { Icon, IconName } from '../components/ui/Icon';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { SchoolsScreen } from '../screens/schools/SchoolsScreen';
 import { DanceCircleScreen } from '../screens/dance/DanceCircleScreen';
-import { FavoritesScreen } from '../screens/social/FavoritesScreen';
+import { MyEventsScreen } from '../screens/social/FavoritesScreen';
 import { ProfileScreen } from '../screens/social/ProfileScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -27,7 +27,7 @@ const tabLabels: Record<keyof MainTabsParamList, string> = {
   Explore: 'Keşfet',
   Schools: 'Okullar',
   DanceCircle: 'DanceCircle',
-  Favorites: 'Favoriler',
+  Favorites: 'Etkinlikler',
   Profile: 'Profil',
 };
 
@@ -87,7 +87,7 @@ export const MainTabs: React.FC = () => {
       <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Schools" component={SchoolsScreen} />
       <Tab.Screen name="DanceCircle" component={DanceCircleScreen} />
-      <Tab.Screen name="Favorites" component={FavoritesScreen} />
+      <Tab.Screen name="Favorites" component={MyEventsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

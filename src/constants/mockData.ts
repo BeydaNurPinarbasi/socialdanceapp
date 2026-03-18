@@ -158,7 +158,5 @@ export const mockChats = [
 ];
 
 export const mockFavoritesEvents = [
-  { id: 1, title: 'Latino Night Fever', location: 'Moda Sahne', date: 'Cuma, 22:00', day: '12', month: 'EKİ', isFavorite: true, isPast: true, isDanceStar: true, image: 'https://picsum.photos/seed/latino/400/280', attendees: 26, isPopular: true, attendeeAvatars: ['https://i.pravatar.cc/150?u=21', 'https://i.pravatar.cc/150?u=22'] },
   { id: 2, title: 'Salsa Workshop', location: 'Kadıköy Dans Evi', date: 'Perşembe, 19:00', day: '05', month: 'EKİ', isFavorite: false, isPast: true, isDanceStar: true, image: 'https://picsum.photos/seed/salsa/400/280', attendees: 12, isPopular: false, attendeeAvatars: ['https://i.pravatar.cc/150?u=23', 'https://i.pravatar.cc/150?u=24'] },
-  { id: 3, title: 'Büyük Yılbaşı Partisi', location: 'Swissotel The Bosphorus', date: 'Salı, 20:30', day: '31', month: 'ARA', isFavorite: true, isPast: false, isDanceStar: false, image: 'https://picsum.photos/seed/nye/400/280', attendees: 48, isPopular: true, attendeeAvatars: ['https://i.pravatar.cc/150?u=25', 'https://i.pravatar.cc/150?u=26'] },
 ];

@@ -25,13 +25,16 @@ export interface School {
   id: string;
   name: string;
   location: string;
-  distance: string;
+  distance?: string;
   image: string;
   rating: number;
   ratingCount: number;
   isOpen?: boolean;
   tags?: string[];
   phone?: string;
+  website?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface User {
