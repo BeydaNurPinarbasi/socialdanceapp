@@ -30,7 +30,14 @@ export type MainStackParamList = {
   EditEvent: undefined;
   EditClass: { draftData?: any };
   ChatList: undefined;
-  ChatDetail: { id: string; name: string; avatar: string; isNewChat?: boolean };
+  ChatDetail: {
+    id: string;
+    name: string;
+    avatar: string;
+    isNewChat?: boolean;
+    /** Liste ekranından geliyorsa tekrar oluşturmayı atlamak için */
+    conversationId?: string;
+  };
   NewChat: undefined;
   Marketplace: undefined;
   Cart: undefined;

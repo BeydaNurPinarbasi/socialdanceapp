@@ -1,7 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Modal, Alert, Image } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+  Alert,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { useChats } from '../../context/ChatContext';
 import { Screen } from '../../components/layout/Screen';
@@ -9,6 +23,8 @@ import { Header } from '../../components/layout/Header';
 import { Icon } from '../../components/ui/Icon';
 import { Avatar } from '../../components/ui/Avatar';
 import { MainStackParamList } from '../../types/navigation';
+import { hasSupabaseConfig } from '../../services/api/apiClient';
+import { messageService, formatMessageTime, type DmMessageRow } from '../../services/api/messages';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ChatDetail'>;
 
@@ -22,35 +38,140 @@ type MessageItem = {
   time: string;
 };
 
-const mockMessages: MessageItem[] = [
-  { id: '1', text: 'Merhaba! Yarın etkinlikte görüşürüz.', isMe: false, time: '14:30' },
-  { id: '2', text: 'Merhaba! Evet, orada olacağım 💃', isMe: true, time: '14:32' },
-];
+function isUuid(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+}
+
+function rowToItem(row: DmMessageRow, myUserId: string): MessageItem {
+  return {
+    id: row.id,
+    text: row.body?.trim() ? row.body : undefined,
+    imageUri: row.image_url ?? undefined,
+    isMe: row.sender_id === myUserId,
+    time: formatMessageTime(row.created_at),
+  };
+}
 
 type SheetAction = { id: string; label: string; icon: string; onPress: () => void };
 
 export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
-  const { markAsRead } = useChats();
-  const isNewChat = route.params.isNewChat ?? false;
-  const [messages, setMessages] = useState(isNewChat ? [] : mockMessages);
+  const { markAsRead, refreshChats } = useChats();
+  const [messages, setMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState('');
   const [sheetVisible, setSheetVisible] = useState(false);
   const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const routeConversationId = route.params.conversationId ?? null;
+  const [conversationId, setConversationId] = useState<string | null>(routeConversationId);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [initLoading, setInitLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [listRefreshing, setListRefreshing] = useState(false);
+  const listRef = useRef<FlatList<MessageItem>>(null);
+
+  const peerId = route.params.id;
+
+  const loadMessages = useCallback(
+    async (cid: string, myId: string) => {
+      const rows = await messageService.listMessages(cid);
+      setMessages(rows.map((r) => rowToItem(r, myId)));
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (!isNewChat && route.params.id) {
-      markAsRead(route.params.id);
-    }
-  }, [route.params.id, isNewChat, markAsRead]);
+    let cancelled = false;
 
-  const send = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [...prev, { id: Date.now().toString(), text: input.trim(), isMe: true, time: 'Şimdi' }]);
-    setInput('');
+    async function init() {
+      if (!hasSupabaseConfig()) {
+        setInitError('Supabase yapılandırması eksik.');
+        setInitLoading(false);
+        return;
+      }
+      if (!isUuid(peerId)) {
+        setInitError('Bu sohbet için geçerli bir kullanıcı kimliği gerekir.');
+        setInitLoading(false);
+        return;
+      }
+
+      try {
+        const me = await messageService.getCurrentUserId();
+        if (cancelled) return;
+        setMyUserId(me);
+
+        let cid = routeConversationId;
+        if (!cid) {
+          cid = await messageService.getOrCreateConversation(peerId);
+          if (cancelled) return;
+          setConversationId(cid);
+        } else {
+          setConversationId(cid);
+        }
+
+        await loadMessages(cid, me);
+        if (cancelled) return;
+
+        await markAsRead(cid);
+        void refreshChats();
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : 'Sohbet açılamadı.';
+          setInitError(msg);
+        }
+      } finally {
+        if (!cancelled) setInitLoading(false);
+      }
+    }
+
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, [peerId, routeConversationId, loadMessages, markAsRead, refreshChats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!conversationId || !myUserId) return undefined;
+      const tick = () => {
+        void loadMessages(conversationId, myUserId).catch(() => {});
+      };
+      tick();
+      const id = setInterval(tick, 3500);
+      return () => clearInterval(id);
+    }, [conversationId, myUserId, loadMessages]),
+  );
+
+  const onPullRefresh = useCallback(async () => {
+    if (!conversationId || !myUserId) return;
+    setListRefreshing(true);
+    try {
+      await loadMessages(conversationId, myUserId);
+      void refreshChats();
+    } catch {
+      /* sessiz */
+    } finally {
+      setListRefreshing(false);
+    }
+  }, [conversationId, myUserId, loadMessages, refreshChats]);
+
+  const send = async () => {
+    if (!input.trim() || !conversationId) return;
+    try {
+      const row = await messageService.sendTextMessage(conversationId, input.trim());
+      if (myUserId) {
+        setMessages((prev) => [...prev, rowToItem(row, myUserId)]);
+      }
+      setInput('');
+      void refreshChats();
+      listRef.current?.scrollToEnd({ animated: true });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Mesaj gönderilemedi.';
+      Alert.alert('Hata', msg);
+    }
   };
 
   const pickImage = async () => {
+    if (!conversationId) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('İzin gerekli', 'Galeriye erişim için izin vermeniz gerekiyor.');
@@ -62,14 +183,19 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       quality: 0.8,
     });
     if (!result.canceled && result.assets.length > 0) {
-      const now = Date.now();
-      const newMessages: MessageItem[] = result.assets.map((asset, i) => ({
-        id: `${now}-${i}`,
-        imageUri: asset.uri,
-        isMe: true,
-        time: 'Şimdi',
-      }));
-      setMessages((prev) => [...prev, ...newMessages]);
+      for (const asset of result.assets) {
+        try {
+          const row = await messageService.sendImageMessage(conversationId, asset.uri);
+          if (myUserId) {
+            setMessages((prev) => [...prev, rowToItem(row, myUserId)]);
+          }
+          void refreshChats();
+          listRef.current?.scrollToEnd({ animated: true });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Fotoğraf gönderilemedi.';
+          Alert.alert('Hata', msg);
+        }
+      }
     }
   };
 
@@ -132,11 +258,33 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  if (initLoading) {
+    return (
+      <Screen>
+        <Header title={route.params.name} showBack />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (initError) {
+    return (
+      <Screen>
+        <Header title={route.params.name} showBack />
+        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+          <Text style={[typography.body, { color: colors.text, textAlign: 'center' }]}>{initError}</Text>
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={closeSheet}>
         <View style={styles.sheetOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeSheet} />
+          <TouchableOpacity style={styles.absoluteFill} activeOpacity={1} onPress={closeSheet} />
           <View style={[styles.sheetBox, { backgroundColor: colors.headerBg ?? '#2C1C2D', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }]}>
           <View style={[styles.sheetHandle, { backgroundColor: colors.textTertiary }]} />
           <View style={[styles.sheetHeader, { marginBottom: spacing.lg }]}>
@@ -170,10 +318,22 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <FlatList
+          ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.sm, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          alwaysBounceVertical
+          overScrollMode={Platform.OS === 'android' ? 'always' : 'auto'}
+          refreshControl={
+            <RefreshControl
+              refreshing={listRefreshing}
+              onRefresh={() => void onPullRefresh()}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           renderItem={({ item }) => (
           <View
             style={[
@@ -232,17 +392,24 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
 const IMAGE_SIZE = 200;
 
-const styles = StyleSheet.create({
+const styles = {
+  absoluteFill: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
   bubble: {},
   messageImage: { width: IMAGE_SIZE, height: IMAGE_SIZE, borderRadius: 12 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1 },
-  galleryBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  inputRow: { flexDirection: 'row' as const, alignItems: 'center' as const, borderTopWidth: 1 },
+  galleryBtn: { width: 44, height: 44, alignItems: 'center' as const, justifyContent: 'center' as const },
   input: { flex: 1, paddingHorizontal: 16, paddingVertical: 12 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center' as const, justifyContent: 'center' as const, marginLeft: 8 },
   sheetOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-end' as const,
   },
   sheetBox: {
     paddingTop: 12,
@@ -253,16 +420,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: 'center' as const,
     marginBottom: 20,
   },
   sheetHeader: {
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
   sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
-});
+};

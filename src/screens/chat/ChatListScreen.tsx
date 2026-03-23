@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { View, FlatList, Text, ActivityIndicator, RefreshControl, ScrollView, Platform } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { Header } from '../../components/layout/Header';
@@ -14,12 +14,18 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 export const ChatListScreen: React.FC = () => {
   const navigation = useNavigation() as Nav;
-  const { spacing } = useTheme();
-  const { chats } = useChats();
+  const { spacing, colors, typography } = useTheme();
+  const { chats, loading, error, refreshChats } = useChats();
   const [search, setSearch] = useState('');
 
+  useFocusEffect(
+    useCallback(() => {
+      void refreshChats();
+    }, [refreshChats]),
+  );
+
   const filtered = chats.filter(
-    (c) => !search || c.name.toLowerCase().includes(search.toLowerCase())
+    (c) => !search || c.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -38,31 +44,65 @@ export const ChatListScreen: React.FC = () => {
           backgroundColor="#482347"
         />
       </View>
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <UserListItem
-            name={item.name}
-            subtitle={item.lastMessage}
-            avatar={item.avatar}
-            timestamp={item.time}
-            unreadCount={item.unread}
-            showOnline={item.isOnline}
-            nameColor="#FFFFFF"
-            onPress={() =>
-              navigation.navigate('ChatDetail', {
-                id: item.id,
-                name: item.name,
-                avatar: item.avatar,
-              })
-            }
-          />
-        )}
-      />
+      {loading && chats.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : error ? (
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => void refreshChats()}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          <Text style={[typography.bodySmall, { color: colors.textTertiary }]}>{error}</Text>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.conversationId}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100, flexGrow: 1 }}
+          alwaysBounceVertical
+          overScrollMode={Platform.OS === 'android' ? 'always' : 'auto'}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading && chats.length > 0}
+              onRefresh={() => void refreshChats()}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <Text style={[typography.body, { color: colors.textTertiary, textAlign: 'center', marginTop: spacing.xl }]}>
+              Henüz sohbet yok. Takip ettiklerinden veya bir profilden mesaj göndererek başlayabilirsin.
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <UserListItem
+              name={item.name}
+              subtitle={item.lastMessage}
+              avatar={item.avatar}
+              timestamp={item.time}
+              unreadCount={item.unread}
+              showOnline={item.isOnline}
+              nameColor="#FFFFFF"
+              onPress={() =>
+                navigation.navigate('ChatDetail', {
+                  conversationId: item.conversationId,
+                  id: item.peerId,
+                  name: item.name,
+                  avatar: item.avatar,
+                })
+              }
+            />
+          )}
+        />
+      )}
     </Screen>
   );
 };
-
-const styles = StyleSheet.create({});

@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { mockChats } from '../constants/mockData';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { hasSupabaseConfig } from '../services/api/apiClient';
+import { formatChatListTime, messageService, type ConversationListItem } from '../services/api/messages';
 
 export interface ChatConversation {
-  id: string;
+  conversationId: string;
+  peerId: string;
   name: string;
   avatar: string;
   lastMessage: string;
@@ -13,27 +15,79 @@ export interface ChatConversation {
 
 interface ChatContextValue {
   chats: ChatConversation[];
-  markAsRead: (chatId: string) => void;
+  loading: boolean;
+  error: string | null;
+  refreshChats: () => Promise<void>;
+  /** Okundu işaretle (sunucu + yerel liste) */
+  markAsRead: (conversationId: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
-export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [chats, setChats] = useState<ChatConversation[]>(() => [...mockChats]);
+function mapRowToChat(row: ConversationListItem): ChatConversation {
+  const preview = row.lastBody?.trim() ? row.lastBody : row.lastAt ? '📷 Fotoğraf' : '';
+  return {
+    conversationId: row.conversationId,
+    peerId: row.peerId,
+    name: row.peerDisplayName,
+    avatar: row.peerAvatarUrl ?? '',
+    lastMessage: preview,
+    time: formatChatListTime(row.lastAt),
+    unread: row.unreadCount,
+    isOnline: false,
+  };
+}
 
-  const markAsRead = useCallback((chatId: string) => {
-    setChats((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c))
-    );
+export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [chats, setChats] = useState<ChatConversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshChats = useCallback(async () => {
+    if (!hasSupabaseConfig()) {
+      setChats([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await messageService.listConversations();
+      setChats(rows.map(mapRowToChat));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Mesajlar yüklenemedi.';
+      setError(msg);
+      setChats([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const value: ChatContextValue = { chats, markAsRead };
+  useEffect(() => {
+    void refreshChats();
+  }, [refreshChats]);
 
-  return (
-    <ChatContext.Provider value={value}>
-      {children}
-    </ChatContext.Provider>
+  const markAsRead = useCallback(async (conversationId: string) => {
+    try {
+      await messageService.markConversationRead(conversationId);
+      setChats((prev) =>
+        prev.map((c) => (c.conversationId === conversationId ? { ...c, unread: 0 } : c)),
+      );
+    } catch {
+      setChats((prev) =>
+        prev.map((c) => (c.conversationId === conversationId ? { ...c, unread: 0 } : c)),
+      );
+    }
+  }, []);
+
+  const value = useMemo<ChatContextValue>(
+    () => ({ chats, loading, error, refreshChats, markAsRead }),
+    [chats, loading, error, refreshChats, markAsRead],
   );
+
+  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };
 
 export function useChats(): ChatContextValue {

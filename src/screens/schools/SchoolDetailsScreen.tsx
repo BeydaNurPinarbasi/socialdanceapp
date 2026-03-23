@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Share, Image, Linking, Alert } from 'react-native';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Share, Image, Linking, Alert, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
@@ -12,6 +12,8 @@ import { MainStackParamList } from '../../types/navigation';
 import { LoadingSpinner } from '../../components/feedback/LoadingSpinner';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { getSchoolById } from '../../services/api/schools';
+import { listSchoolEvents } from '../../services/api/schoolEvents';
+import { listSchoolClasses } from '../../services/api/schoolClasses';
 import { addFavoriteSchool, isSchoolFavorited, removeFavoriteSchool } from '../../services/api/favorites';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'SchoolDetails'>;
@@ -40,6 +42,46 @@ type SchoolDetailsVm = typeof defaultSchool & {
   website?: string;
 };
 
+function isMissingSchoolEventsError(error: unknown): boolean {
+  const blob =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : JSON.stringify(error ?? '');
+  const lower = blob.toLowerCase();
+  return (
+    lower.includes('school_events') &&
+    (lower.includes('could not find') || lower.includes('schema cache') || lower.includes('pgrst'))
+  );
+}
+
+function isMissingSchoolClassesError(error: unknown): boolean {
+  const blob =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : JSON.stringify(error ?? '');
+  const lower = blob.toLowerCase();
+  return (
+    lower.includes('school_classes') &&
+    (lower.includes('could not find') || lower.includes('schema cache') || lower.includes('pgrst'))
+  );
+}
+
+function formatEventDateLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('tr-TR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   const { colors, spacing, radius, typography } = useTheme();
   const insets = useSafeAreaInsets();
@@ -47,6 +89,7 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [school, setSchool] = useState<SchoolDetailsVm | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,55 +107,94 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
     };
   }, [route.params.id]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const loadSchool = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
-    (async () => {
+    try {
+      const row = await getSchoolById(route.params.id);
+      let classRows: Awaited<ReturnType<typeof listSchoolClasses>> = [];
       try {
-        const row = await getSchoolById(route.params.id);
-        if (cancelled) return;
-        if (!row) {
-          setError('Okul bulunamadı');
-          setSchool(null);
-          return;
-        }
-
-        const location =
-          [row.district, row.city].filter(Boolean).join(', ') ||
-          row.address ||
-          defaultSchool.location;
-        const image =
-          row.image_url ||
-          `https://picsum.photos/seed/${encodeURIComponent(row.name)}/700/500`;
-        const description = (row as any).snippet ? String((row as any).snippet).trim() : '';
-
-        setSchool({
-          ...defaultSchool,
-          id: row.id,
-          name: row.name,
-          location,
-          image,
-          rating: typeof row.rating === 'number' && Number.isFinite(row.rating) ? row.rating : defaultSchool.rating,
-          ratingCount: typeof row.review_count === 'number' && Number.isFinite(row.review_count) ? row.review_count : defaultSchool.ratingCount,
-          description,
-          phone: row.telephone || undefined,
-          website: row.website || undefined,
-          classes: defaultSchool.classes,
-          events: defaultSchool.events,
-        });
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : 'Okul yüklenemedi');
-        setSchool(null);
-      } finally {
-        if (!cancelled) setLoading(false);
+        classRows = await listSchoolClasses(route.params.id);
+      } catch (classError) {
+        // If API schema cache is stale, keep school details working and show empty schedule.
+        if (!isMissingSchoolClassesError(classError)) throw classError;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      let eventRows: Awaited<ReturnType<typeof listSchoolEvents>> = [];
+      try {
+        eventRows = await listSchoolEvents(route.params.id);
+      } catch (eventError) {
+        // If API schema cache is stale, keep school details working and show empty events.
+        if (!isMissingSchoolEventsError(eventError)) throw eventError;
+      }
+      if (!row) {
+        setError('Okul bulunamadı');
+        setSchool(null);
+        return;
+      }
+
+      const location =
+        [row.district, row.city].filter(Boolean).join(', ') ||
+        row.address ||
+        defaultSchool.location;
+      const image =
+        row.image_url ||
+        `https://picsum.photos/seed/${encodeURIComponent(row.name)}/700/500`;
+      const description = (row as any).snippet ? String((row as any).snippet).trim() : '';
+
+      const schoolEvents =
+        eventRows.length > 0
+          ? eventRows.map((eventRow) => ({
+              id: eventRow.id,
+              title: eventRow.title,
+              date: formatEventDateLabel(eventRow.starts_at),
+            }))
+          : [];
+      const schoolClasses =
+        classRows.length > 0
+          ? classRows.map((classRow) => ({
+              id: classRow.id,
+              title: classRow.title,
+              time: classRow.time,
+              day: classRow.day,
+              level: classRow.level,
+            }))
+          : [];
+
+      setSchool({
+        ...defaultSchool,
+        id: row.id,
+        name: row.name,
+        location,
+        image,
+        rating: typeof row.rating === 'number' && Number.isFinite(row.rating) ? row.rating : defaultSchool.rating,
+        ratingCount: typeof row.review_count === 'number' && Number.isFinite(row.review_count) ? row.review_count : defaultSchool.ratingCount,
+        description,
+        phone: row.telephone || undefined,
+        website: row.website || undefined,
+        classes: schoolClasses,
+        events: schoolEvents,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Okul yüklenemedi');
+      setSchool(null);
+    } finally {
+      if (!opts?.silent) setLoading(false);
+    }
   }, [route.params.id]);
+
+  useEffect(() => {
+    loadSchool();
+  }, [loadSchool]);
+
+  const onRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await loadSchool({ silent: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadSchool, refreshing]);
 
   const currentSchool: SchoolDetailsVm = useMemo(() => school ?? defaultSchool, [school]);
 
@@ -174,7 +256,7 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <Screen edges={[]}>
       {loading ? (
-        <LoadingSpinner fullScreen message="Okul yükleniyor..." />
+        <LoadingSpinner fullScreen message="Okul yükleniyor..." color="#FFFFFF" />
       ) : error ? (
         <View style={{ paddingTop: insets.top }}>
           <EmptyState icon="school-outline" title="Okul yüklenemedi" subtitle={error} />
@@ -185,8 +267,17 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
             style={{ flex: 1 }}
             contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#FFFFFF"
+                colors={['#FFFFFF']}
+                progressViewOffset={insets.top + 72}
+              />
+            }
           >
-            <View style={styles.heroWrap}>
+            <View style={[styles.heroWrap, { marginTop: insets.top }]}>
               <Image source={{ uri: currentSchool.image }} style={styles.heroImage} />
               <View style={[styles.heroGradient, { backgroundColor: 'transparent' }]} />
             </View>
@@ -223,47 +314,61 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {activeTab === 'schedule' && (
             <View style={{ marginTop: spacing.lg, gap: spacing.md }}>
-              {currentSchool.classes.map((c: (typeof defaultSchool.classes)[number]) => (
-                <TouchableOpacity
-                  key={c.id}
-                  onPress={() => navigation.navigate('ClassDetails', { id: c.id })}
-                  activeOpacity={0.8}
-                  style={[styles.cardRow, { backgroundColor: '#311831', borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', padding: spacing.lg }]}
-                >
-                  <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
-                    <Icon name="calendar-clock" size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: spacing.md }}>
-                    <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>{c.title}</Text>
-                    <Text style={[typography.caption, { color: 'rgba(255,255,255,0.7)' }]}>
-                      {c.day} • {c.time} • {c.level}
-                    </Text>
-                  </View>
-                  <Icon name="chevron-right" size={20} color="#9CA3AF" />
-                </TouchableOpacity>
-              ))}
+              {currentSchool.classes.length === 0 ? (
+                <EmptyState
+                  icon="calendar-clock"
+                  title="Ders programı bulunamadı"
+                  subtitle="Bu okul için henüz ders programı eklenmemiş."
+                />
+              ) : (
+                currentSchool.classes.map((c: (typeof defaultSchool.classes)[number]) => (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => navigation.navigate('ClassDetails', { id: c.id })}
+                    activeOpacity={0.8}
+                    style={[styles.cardRow, { backgroundColor: '#311831', borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', padding: spacing.lg }]}
+                  >
+                    <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
+                      <Icon name="calendar-clock" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: spacing.md }}>
+                      <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>{c.title}</Text>
+                      <Text style={[typography.caption, { color: 'rgba(255,255,255,0.7)' }]}>
+                        {c.day} • {c.time} • {c.level}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
           )}
 
           {activeTab === 'events' && (
             <View style={{ marginTop: spacing.lg, gap: spacing.md }}>
-              {currentSchool.events.map((e: (typeof defaultSchool.events)[number]) => (
-                <TouchableOpacity
-                  key={e.id}
-                  onPress={() => navigation.navigate('EventDetails', { id: e.id })}
-                  activeOpacity={0.8}
-                  style={[styles.cardRow, { backgroundColor: '#311831', borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', padding: spacing.lg }]}
-                >
-                  <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
-                    <Icon name="party-popper" size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: spacing.md }}>
-                    <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>{e.title}</Text>
-                    <Text style={[typography.caption, { color: 'rgba(255,255,255,0.7)' }]}>{e.date}</Text>
-                  </View>
-                  <Icon name="chevron-right" size={20} color="#9CA3AF" />
-                </TouchableOpacity>
-              ))}
+              {currentSchool.events.length === 0 ? (
+                <EmptyState
+                  icon="calendar-blank-outline"
+                  title="Etkinlik bulunamadı"
+                  subtitle="Bu okul için henüz etkinlik eklenmemiş."
+                />
+              ) : (
+                currentSchool.events.map((e: (typeof defaultSchool.events)[number]) => (
+                  <TouchableOpacity
+                    key={e.id}
+                    activeOpacity={0.8}
+                    style={[styles.cardRow, { backgroundColor: '#311831', borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', padding: spacing.lg }]}
+                  >
+                    <View style={[styles.iconBox, { backgroundColor: '#4B154B', borderColor: 'rgba(255,255,255,0.2)', borderRadius: 100 }]}>
+                      <Icon name="party-popper" size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: spacing.md }}>
+                      <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>{e.title}</Text>
+                      <Text style={[typography.caption, { color: 'rgba(255,255,255,0.7)' }]}>{e.date}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
           )}
 
