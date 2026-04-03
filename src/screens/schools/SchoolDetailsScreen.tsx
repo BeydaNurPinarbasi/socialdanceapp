@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Share, Image, Linking, Alert, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Share,
+  Image,
+  Linking,
+  Alert,
+  RefreshControl,
+  Modal,
+  Pressable,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../../theme';
@@ -70,6 +83,14 @@ function isMissingSchoolClassesError(error: unknown): boolean {
   );
 }
 
+function normalizeDigitsForWhatsApp(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('90') && d.length >= 12) return d;
+  if (d.startsWith('0') && d.length >= 10) return `90${d.slice(1)}`;
+  return d;
+}
+
 function formatEventDateLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -91,6 +112,7 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contactModalVisible, setContactModalVisible] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,17 +261,31 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
     { key: 'events', label: 'Etkinlikler' },
   ];
 
-  const handleContact = () => {
-    const phone = currentSchool.phone ? String(currentSchool.phone).replace(/[^\d+]/g, '') : '';
-    const website = currentSchool.website ? String(currentSchool.website).trim() : '';
+  const contactPhoneRaw = currentSchool.phone ? String(currentSchool.phone).trim() : '';
+  const contactTelHref = contactPhoneRaw.replace(/[^\d+]/g, '');
+  const contactWaDigits = contactPhoneRaw ? normalizeDigitsForWhatsApp(contactPhoneRaw) : '';
+  const contactWebsite = currentSchool.website ? String(currentSchool.website).trim() : '';
+  const contactWebsiteUrl = contactWebsite
+    ? contactWebsite.startsWith('http')
+      ? contactWebsite
+      : `https://${contactWebsite}`
+    : '';
 
-    if (phone) {
-      Linking.openURL(`tel:${phone}`).catch(() => {});
+  const openWhatsApp = () => {
+    if (!contactWaDigits) return;
+    const url = `https://wa.me/${contactWaDigits}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('WhatsApp açılamadı', 'Cihazınızda WhatsApp yüklü mü kontrol edin.');
+    });
+  };
+
+  const handleContact = () => {
+    if (contactTelHref || contactWaDigits) {
+      setContactModalVisible(true);
       return;
     }
-    if (website) {
-      const url = website.startsWith('http') ? website : `https://${website}`;
-      Linking.openURL(url).catch(() => {});
+    if (contactWebsiteUrl) {
+      Linking.openURL(contactWebsiteUrl).catch(() => {});
     }
   };
 
@@ -390,13 +426,79 @@ export const SchoolDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
             <Button
               title="İletişime Geç"
               onPress={handleContact}
-              disabled={!currentSchool.phone && !currentSchool.website}
+              disabled={!contactTelHref && !contactWebsiteUrl}
               fullWidth
               style={{ borderRadius: 50 }}
             />
           </View>
             </View>
           </ScrollView>
+
+          <Modal
+            visible={contactModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setContactModalVisible(false)}
+          >
+            <Pressable style={styles.contactModalOverlay} onPress={() => setContactModalVisible(false)}>
+              <Pressable
+                style={[styles.contactModalSheet, { backgroundColor: '#311831', borderColor: 'rgba(255,255,255,0.12)', borderRadius: radius.xl }]}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.md }]}>İletişime geç</Text>
+                {contactWaDigits ? (
+                  <TouchableOpacity
+                    style={[styles.contactModalRow, { borderColor: 'rgba(255,255,255,0.12)' }]}
+                    onPress={() => {
+                      setContactModalVisible(false);
+                      openWhatsApp();
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Icon name="whatsapp" size={22} color="#25D366" />
+                    <Text style={[typography.bodyMedium, { color: '#FFFFFF', marginLeft: spacing.md, flex: 1 }]}>WhatsApp ile yaz</Text>
+                    <Icon name="chevron-right" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : null}
+                {contactTelHref ? (
+                  <TouchableOpacity
+                    style={[styles.contactModalRow, { borderColor: 'rgba(255,255,255,0.12)', marginTop: spacing.sm }]}
+                    onPress={() => {
+                      setContactModalVisible(false);
+                      Linking.openURL(`tel:${contactTelHref}`).catch(() => {});
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Icon name="phone-outline" size={22} color={colors.primary} />
+                    <Text style={[typography.bodyMedium, { color: '#FFFFFF', marginLeft: spacing.md, flex: 1 }]}>Telefon ile ara</Text>
+                    <Icon name="chevron-right" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : null}
+                {contactWebsiteUrl ? (
+                  <TouchableOpacity
+                    style={[styles.contactModalRow, { borderColor: 'rgba(255,255,255,0.12)', marginTop: spacing.sm }]}
+                    onPress={() => {
+                      setContactModalVisible(false);
+                      Linking.openURL(contactWebsiteUrl).catch(() => {});
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Icon name="web" size={22} color={colors.primary} />
+                    <Text style={[typography.bodyMedium, { color: '#FFFFFF', marginLeft: spacing.md, flex: 1 }]}>Web sitesini aç</Text>
+                    <Icon name="chevron-right" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={{ marginTop: spacing.lg, paddingVertical: spacing.md, alignItems: 'center' }}
+                  onPress={() => setContactModalVisible(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[typography.bodySmallBold, { color: '#9CA3AF' }]}>Kapat</Text>
+                </TouchableOpacity>
+              </Pressable>
+            </Pressable>
+          </Modal>
+
           <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
             <Header title="" showBack rightComponent={headerRight} transparent backButtonOverlay alignTop />
           </View>
@@ -435,4 +537,24 @@ const styles = StyleSheet.create({
   },
   cardRow: { flexDirection: 'row', alignItems: 'center' },
   bottomBar: { flexDirection: 'row', alignItems: 'center' },
+  contactModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+    padding: 16,
+    paddingBottom: 32,
+  },
+  contactModalSheet: {
+    borderWidth: 1,
+    padding: 20,
+  },
+  contactModalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
 });

@@ -15,6 +15,7 @@ type ProfileRow = {
 };
 
 type VoteRow = { target_id: string; vote: 'like' | 'skip' };
+type LikeVoteRow = { target_id: string; created_at: string };
 
 export type DanceCircleVote = 'like' | 'skip';
 
@@ -27,6 +28,14 @@ export type DanceCircleCandidate = {
   danceStyles: string[];
   city: string;
   level: 'Başlangıç' | 'Orta' | 'İleri';
+};
+
+/** Dance Circle’da «dans ettim» (like) işaretlenen kullanıcılar; en yeni üstte. */
+export type DancedWithPerson = {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
 };
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -122,6 +131,41 @@ export const danceCircleService = {
     });
   },
 
+  async listMyDancedWith(): Promise<DancedWithPerson[]> {
+    return await withAuthorizedUserRequest(async (accessToken) => {
+      const me = await getMyUserId(accessToken);
+      const votes = await supabaseRestRequest<LikeVoteRow[]>(
+        `/dance_circle_votes?voter_id=eq.${encodeURIComponent(me)}&vote=eq.like&select=target_id,created_at&order=created_at.desc`,
+        { accessToken },
+      );
+      const ordered = votes ?? [];
+      if (ordered.length === 0) return [];
+
+      const ids = [...new Set(ordered.map((v) => v.target_id))];
+      const idIn = ids.map((id) => encodeURIComponent(id)).join(',');
+      const profiles = await supabaseRestRequest<ProfileRow[]>(
+        `/profiles?id=in.(${idIn})&select=id,display_name,username,avatar_url,bio,other_interests`,
+        { accessToken },
+      );
+      const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+      const out: DancedWithPerson[] = [];
+      for (const v of ordered) {
+        const p = byId.get(v.target_id);
+        if (!p) continue;
+        const username = (p.username ?? '').trim();
+        const displayName = (p.display_name ?? '').trim() || username || 'Kullanıcı';
+        out.push({
+          id: p.id,
+          name: displayName,
+          username,
+          avatar: p.avatar_url ?? '',
+        });
+      }
+      return out;
+    });
+  },
+
   async submitVote(targetId: string, vote: DanceCircleVote): Promise<void> {
     await withAuthorizedUserRequest(async (accessToken) => {
       const me = await getMyUserId(accessToken);
@@ -140,6 +184,41 @@ export const danceCircleService = {
           },
         },
       );
+    });
+  },
+
+  /**
+   * Mevcut kullanıcının tüm Dance Circle oylarını siler.
+   * Not: RLS'te DELETE politikası yoksa Postgres hata fırlatmaz; DELETE 0 satır etkiler.
+   * Bu yüzden önce SELECT ile oy varlığı kontrol edilir, sonra silme sonucu karşılaştırılır.
+   */
+  async resetMyVotes(): Promise<{ deleted: number; hadVotesBefore: boolean }> {
+    return await withAuthorizedUserRequest(async (accessToken) => {
+      const me = await getMyUserId(accessToken);
+      const existing = await supabaseRestRequest<VoteRow[]>(
+        `/dance_circle_votes?voter_id=eq.${encodeURIComponent(me)}&select=target_id,vote`,
+        { accessToken },
+      );
+      const hadVotesBefore = Array.isArray(existing) && existing.length > 0;
+      if (!hadVotesBefore) {
+        return { deleted: 0, hadVotesBefore: false };
+      }
+
+      const deleted = await supabaseRestRequest<VoteRow[] | null>(
+        `/dance_circle_votes?voter_id=eq.${encodeURIComponent(me)}`,
+        {
+          method: 'DELETE',
+          accessToken,
+          headers: { Prefer: 'return=representation' },
+        },
+      );
+      const deletedCount = Array.isArray(deleted) ? deleted.length : 0;
+      if (hadVotesBefore && deletedCount === 0) {
+        throw new Error(
+          'Oylar veritabanında görünüyor ama silinemedi. Supabase’de `dance_circle_votes` tablosuna DELETE RLS politikası ekleyin (migration: 20260403_dance_circle_votes_delete_policy.sql) ve uzak projede migration’ı uygulayın.',
+        );
+      }
+      return { deleted: deletedCount, hadVotesBefore: true };
     });
   },
 };

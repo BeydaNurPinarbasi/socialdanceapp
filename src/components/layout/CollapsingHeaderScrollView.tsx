@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, ScrollViewProps } from 'react-native';
+import { View, StyleSheet, ScrollView, ScrollViewProps, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { Header } from './Header';
@@ -44,12 +44,19 @@ export const CollapsingHeaderScrollView: React.FC<CollapsingHeaderScrollViewProp
   return (
     <>
       {!hideHeader && (
-        <View style={[styles.headerWrap, { paddingTop: insets.top, backgroundColor: bgColor }]}>
+        <View
+          style={[
+            styles.headerWrap,
+            { paddingTop: insets.top, backgroundColor: bgColor },
+            Platform.OS === 'android' ? { elevation: 12 } : null,
+          ]}
+        >
           <Header {...headerProps} />
           {headerExtra && <View style={styles.headerExtra}>{headerExtra}</View>}
         </View>
       )}
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           { paddingTop: contentTop },
           StyleSheet.flatten(contentContainerStyle),

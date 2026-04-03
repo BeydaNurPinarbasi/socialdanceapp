@@ -45,23 +45,68 @@ async function getMyUserId(accessToken: string): Promise<string> {
 
 export type FollowCounts = { followers: number; following: number };
 
+async function rpcFollowCounts(accessToken: string, userId: string): Promise<FollowCounts> {
+  const rows = await supabaseRestRequest<Array<{ followers_count: number; following_count: number }>>(
+    '/rpc/get_follow_counts',
+    {
+      method: 'POST',
+      accessToken,
+      body: { p_user_id: userId },
+    },
+  );
+  const row = rows?.[0];
+  return {
+    followers: Number(row?.followers_count ?? 0),
+    following: Number(row?.following_count ?? 0),
+  };
+}
+
 export const followService = {
   async getMyFollowCounts(): Promise<FollowCounts> {
     return await withAuthorizedUserRequest(async (accessToken) => {
       const userId = await getMyUserId(accessToken);
-      const rows = await supabaseRestRequest<Array<{ followers_count: number; following_count: number }>>(
-        '/rpc/get_follow_counts',
-        {
-          method: 'POST',
-          accessToken,
-          body: { p_user_id: userId },
-        },
+      return rpcFollowCounts(accessToken, userId);
+    });
+  },
+
+  async getFollowCountsForUser(userId: string): Promise<FollowCounts> {
+    return await withAuthorizedUserRequest(async (accessToken) => {
+      return rpcFollowCounts(accessToken, userId);
+    });
+  },
+
+  async isFollowing(targetUserId: string): Promise<boolean> {
+    return await withAuthorizedUserRequest(async (accessToken) => {
+      const me = await getMyUserId(accessToken);
+      if (me === targetUserId) return false;
+      const rows = await supabaseRestRequest<Array<{ following_id: string }>>(
+        `/follows?follower_id=eq.${encodeURIComponent(me)}&following_id=eq.${encodeURIComponent(targetUserId)}&select=following_id&limit=1`,
+        { method: 'GET', accessToken },
       );
-      const row = rows?.[0];
-      return {
-        followers: Number(row?.followers_count ?? 0),
-        following: Number(row?.following_count ?? 0),
-      };
+      return (rows?.length ?? 0) > 0;
+    });
+  },
+
+  async followUser(targetUserId: string): Promise<void> {
+    await withAuthorizedUserRequest(async (accessToken) => {
+      const me = await getMyUserId(accessToken);
+      if (me === targetUserId) return;
+      await supabaseRestRequest('/follows', {
+        method: 'POST',
+        accessToken,
+        headers: { Prefer: 'return=minimal' },
+        body: { follower_id: me, following_id: targetUserId },
+      });
+    });
+  },
+
+  async unfollowUser(targetUserId: string): Promise<void> {
+    await withAuthorizedUserRequest(async (accessToken) => {
+      const me = await getMyUserId(accessToken);
+      await supabaseRestRequest(
+        `/follows?follower_id=eq.${encodeURIComponent(me)}&following_id=eq.${encodeURIComponent(targetUserId)}`,
+        { method: 'DELETE', accessToken, headers: { Prefer: 'return=minimal' } },
+      );
     });
   },
 };

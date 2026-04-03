@@ -347,6 +347,66 @@ export async function supabaseStorageUpload(
   }
 }
 
+export async function supabaseStorageRemove(
+  path: string,
+  opts: {
+    accessToken?: string | null;
+    timeoutMs?: number;
+  } = {},
+): Promise<void> {
+  const supabaseUrl = getSupabaseUrl();
+  const publishableKey = getSupabasePublishableKey();
+
+  if (!supabaseUrl || !publishableKey) {
+    throw new ApiError(
+      'Supabase ayarlari eksik. EXPO_PUBLIC_SUPABASE_URL ve EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY tanimlanmali.',
+      { status: 0 },
+    );
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 30000);
+  const headers: Record<string, string> = {
+    apikey: publishableKey,
+  };
+  if (opts.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
+
+  try {
+    const res = await fetch(`${supabaseUrl}/storage/v1/object/${path}`, {
+      method: 'DELETE',
+      headers,
+      signal: controller.signal,
+    });
+
+    if (res.status === 404) return;
+
+    const raw = await safeReadText(res);
+    const contentType = res.headers.get('content-type') || '';
+    const parsed = contentType.includes('application/json') && raw
+      ? (() => {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined;
+
+    if (!res.ok) {
+      const { message, code } = extractErrorMessage(parsed ?? raw, raw || `Request failed (${res.status})`);
+      throw new ApiError(message, { status: res.status, code, details: parsed ?? raw });
+    }
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new ApiError('Request timed out.', { status: 0, code: 'TIMEOUT' });
+    }
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(err?.message || 'Network error.', { status: 0, code: 'NETWORK_ERROR', details: err });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function getSupabaseStoragePublicUrl(bucket: string, objectPath: string): string {
   const supabaseUrl = getSupabaseUrl();
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${objectPath}`;

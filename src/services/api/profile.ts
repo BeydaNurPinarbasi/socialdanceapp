@@ -16,6 +16,7 @@ export type ProfileModel = {
   email: string;
   favoriteDances: string[];
   otherInterests: string;
+  notificationsEnabled: boolean;
 };
 
 type SupabaseUserResponse = {
@@ -38,6 +39,7 @@ type SupabaseProfileRow = {
   bio?: string | null;
   favorite_dances?: string[] | null;
   other_interests?: string | null;
+  notifications_enabled?: boolean | null;
 };
 
 type SupabaseProfileUpsert = {
@@ -48,6 +50,7 @@ type SupabaseProfileUpsert = {
   bio?: string | null;
   favorite_dances?: string[];
   other_interests?: string | null;
+  notifications_enabled?: boolean;
 };
 
 const PROFILE_AVATAR_BUCKET = 'profile-images';
@@ -71,6 +74,7 @@ function mapSupabaseProfile(authUser: SupabaseUserResponse, row: SupabaseProfile
     bio: row.bio ?? null,
     favoriteDances: row.favorite_dances ?? [],
     otherInterests: row.other_interests ?? null,
+    notificationsEnabled: row.notifications_enabled !== false,
   };
 }
 
@@ -83,6 +87,7 @@ function mapUserDtoToProfile(user: UserDto): ProfileModel {
     email: (user.email ?? '').trim(),
     favoriteDances: user.favoriteDances ?? [],
     otherInterests: (user.otherInterests ?? '').trim(),
+    notificationsEnabled: user.notificationsEnabled !== false,
   };
 }
 
@@ -183,7 +188,7 @@ async function getAuthUser(accessToken: string): Promise<SupabaseUserResponse> {
 
 async function getProfileRow(accessToken: string, userId: string): Promise<SupabaseProfileRow | null> {
   const rows = await supabaseRestRequest<SupabaseProfileRow[]>(
-    `/profiles?select=id,display_name,username,avatar_url,bio,favorite_dances,other_interests&id=eq.${encodeURIComponent(userId)}&limit=1`,
+    `/profiles?select=id,display_name,username,avatar_url,bio,favorite_dances,other_interests,notifications_enabled&id=eq.${encodeURIComponent(userId)}&limit=1`,
     { accessToken },
   );
 
@@ -203,6 +208,12 @@ function buildProfileUpsert(
   const bio = updates.bio ?? currentRow?.bio ?? extractMetadataString(fallbackMetadata, 'bio');
   const favoriteDances = updates.favoriteDances ?? currentRow?.favorite_dances ?? extractMetadataStringArray(fallbackMetadata, 'favoriteDances');
   const otherInterests = updates.otherInterests ?? currentRow?.other_interests ?? extractMetadataString(fallbackMetadata, 'otherInterests');
+  const notificationsEnabled =
+    updates.notificationsEnabled !== undefined
+      ? updates.notificationsEnabled
+      : currentRow?.notifications_enabled === false
+        ? false
+        : true;
 
   return {
     id: userId,
@@ -212,6 +223,7 @@ function buildProfileUpsert(
     bio: bio ?? '',
     favorite_dances: favoriteDances ?? [],
     other_interests: otherInterests ?? '',
+    notifications_enabled: notificationsEnabled,
   };
 }
 
@@ -220,7 +232,7 @@ async function upsertProfileRow(
   payload: SupabaseProfileUpsert,
 ): Promise<SupabaseProfileRow> {
   const response = await supabaseRestRequest<SupabaseProfileRow | SupabaseProfileRow[]>(
-    '/profiles?select=id,display_name,username,avatar_url,bio,favorite_dances,other_interests&on_conflict=id',
+    '/profiles?select=id,display_name,username,avatar_url,bio,favorite_dances,other_interests,notifications_enabled&on_conflict=id',
     {
       method: 'POST',
       accessToken,
@@ -239,7 +251,30 @@ async function upsertProfileRow(
   return rows[0];
 }
 
+export type PublicProfileCard = {
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  bio: string;
+  favoriteDances: string[];
+};
+
 export const profileService = {
+  /** Başka kullanıcı kartı (authenticated okuyabilir). */
+  async getPublicProfileById(userId: string): Promise<PublicProfileCard | null> {
+    return await withAuthorizedUserRequest(async (accessToken) => {
+      const row = await getProfileRow(accessToken, userId);
+      if (!row) return null;
+      return {
+        displayName: (row.display_name ?? '').trim(),
+        username: (row.username ?? '').trim(),
+        avatarUrl: row.avatar_url?.trim() || null,
+        bio: (row.bio ?? '').trim(),
+        favoriteDances: Array.isArray(row.favorite_dances) ? row.favorite_dances : [],
+      };
+    });
+  },
+
   async getMe(): Promise<ProfileModel> {
     const res = await withAuthorizedUserRequest(async (accessToken) => {
       const authUser = await getAuthUser(accessToken);
@@ -272,6 +307,7 @@ export const profileService = {
         bio: updates.bio,
         favoriteDances: updates.favoriteDances,
         otherInterests: updates.otherInterests,
+        notificationsEnabled: updates.notificationsEnabled,
       };
 
       const uploadedAvatarUrl = await uploadAvatarIfNeeded(accessToken, currentAuthUser.id, updates.avatarUri);

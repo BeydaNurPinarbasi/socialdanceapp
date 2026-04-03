@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../theme';
@@ -31,7 +30,6 @@ type Props = NativeStackScreenProps<MainStackParamList, 'ChatDetail'>;
 type MessageItem = {
   id: string;
   text?: string;
-  imageUri?: string;
   voiceUri?: string;
   durationSeconds?: number;
   isMe: boolean;
@@ -42,7 +40,6 @@ function rowToItem(row: DmMessageRow, myUserId: string): MessageItem {
   return {
     id: row.id,
     text: row.body?.trim() ? row.body : undefined,
-    imageUri: row.image_url ?? undefined,
     isMe: row.sender_id === myUserId,
     time: formatMessageTime(row.created_at),
   };
@@ -158,35 +155,6 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Mesaj gönderilemedi.';
       Alert.alert('Hata', msg);
-    }
-  };
-
-  const pickImage = async () => {
-    if (!conversationId) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('İzin gerekli', 'Galeriye erişim için izin vermeniz gerekiyor.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      for (const asset of result.assets) {
-        try {
-          const row = await messageService.sendImageMessage(conversationId, asset.uri);
-          if (myUserId) {
-            setMessages((prev) => [...prev, rowToItem(row, myUserId)]);
-          }
-          void refreshChats();
-          listRef.current?.scrollToEnd({ animated: true });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : 'Fotoğraf gönderilemedi.';
-          Alert.alert('Hata', msg);
-        }
-      }
     }
   };
 
@@ -308,8 +276,6 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         titleColor="#FFFFFF"
         showBack
         onTitlePress={() => setSheetVisible(true)}
-        rightIcon="phone"
-        onRightPress={() => {}}
       />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -347,12 +313,7 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               },
             ]}
           >
-            {item.imageUri ? (
-              <>
-                <Image source={{ uri: item.imageUri }} style={styles.messageImage} resizeMode="cover" />
-                <Text style={[typography.label, { color: item.isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary, marginTop: 4 }]}>{item.time}</Text>
-              </>
-            ) : item.voiceUri ? (
+            {item.voiceUri ? (
               <>
                 <Text style={[typography.bodySmall, { color: item.isMe ? '#FFF' : colors.text }]}>🎤 Sesli mesaj {formatDuration(item.durationSeconds ?? 0)}</Text>
                 <Text style={[typography.label, { color: item.isMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary, marginTop: 4 }]}>{item.time}</Text>
@@ -377,9 +338,6 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             returnKeyType="send"
             onSubmitEditing={send}
           />
-          <TouchableOpacity onPress={pickImage} style={[styles.galleryBtn, { marginLeft: spacing.sm }]} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name="image-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
           <TouchableOpacity onPress={send} style={[styles.sendBtn, { backgroundColor: colors.primary }]}>
             <Icon name="send" size={20} color="#FFF" />
           </TouchableOpacity>
@@ -388,8 +346,6 @@ export const ChatDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     </Screen>
   );
 };
-
-const IMAGE_SIZE = 200;
 
 const styles = {
   absoluteFill: {
@@ -400,9 +356,7 @@ const styles = {
     bottom: 0,
   },
   bubble: {},
-  messageImage: { width: IMAGE_SIZE, height: IMAGE_SIZE, borderRadius: 12 },
   inputRow: { flexDirection: 'row' as const, alignItems: 'center' as const, borderTopWidth: 1 },
-  galleryBtn: { width: 44, height: 44, alignItems: 'center' as const, justifyContent: 'center' as const },
   input: { flex: 1, paddingHorizontal: 16, paddingVertical: 12 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center' as const, justifyContent: 'center' as const, marginLeft: 8 },
   sheetOverlay: {

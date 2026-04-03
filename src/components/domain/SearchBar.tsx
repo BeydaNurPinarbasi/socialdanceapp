@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, TextInput, StyleSheet, ViewStyle } from 'react-native';
+import React, { useRef } from 'react';
+import { TextInput, StyleSheet, ViewStyle, Pressable } from 'react-native';
 import { useTheme } from '../../theme';
 import { Icon } from '../ui/Icon';
 
@@ -11,6 +11,8 @@ interface SearchBarProps {
   autoFocus?: boolean;
   /** Özel arka plan rengi (örn. #482347). Verilirse yazı/placeholder açık renk kullanılır. */
   backgroundColor?: string;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -20,7 +22,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   style,
   autoFocus = false,
   backgroundColor: customBg,
+  onFocus,
+  onBlur,
 }) => {
+  const inputRef = useRef<TextInput>(null);
   const { colors, spacing, radius, typography } = useTheme();
   const bgColor = customBg ?? colors.inputBg;
   const isDark = Boolean(customBg);
@@ -29,7 +34,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const borderColor = isDark ? 'rgba(255,255,255,0.12)' : colors.inputBorder;
 
   return (
-    <View
+    <Pressable
       style={[
         styles.container,
         {
@@ -42,9 +47,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         },
         style,
       ]}
+      onPress={() => inputRef.current?.focus()}
     >
       <Icon name="magnify" size={20} color={placeholderColor} />
       <TextInput
+        ref={inputRef}
         style={[
           styles.input,
           typography.body,
@@ -55,8 +62,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         placeholder={placeholder}
         placeholderTextColor={placeholderColor}
         autoFocus={autoFocus}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        returnKeyType="search"
+        clearButtonMode="while-editing"
       />
-    </View>
+    </Pressable>
   );
 };
 

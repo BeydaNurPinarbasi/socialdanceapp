@@ -71,6 +71,7 @@ export const SignUpScreen: React.FC<Props> = ({ navigation }) => {
       email: email.trim(),
       favoriteDances: [],
       otherInterests: '',
+      notificationsEnabled: true,
     };
     try {
       const res = await authService.signUp({

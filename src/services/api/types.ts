@@ -7,6 +7,7 @@ export type UserDto = {
   bio?: string | null;
   favoriteDances?: string[] | null;
   otherInterests?: string | null;
+  notificationsEnabled?: boolean | null;
 };
 
 export type LoginRequestDto = {
@@ -37,7 +38,14 @@ export type MeResponseDto = {
 };
 
 export type UpdateMeRequestDto = Partial<Pick<UserDto,
-  'displayName' | 'username' | 'email' | 'avatarUrl' | 'bio' | 'favoriteDances' | 'otherInterests'
+  | 'displayName'
+  | 'username'
+  | 'email'
+  | 'avatarUrl'
+  | 'bio'
+  | 'favoriteDances'
+  | 'otherInterests'
+  | 'notificationsEnabled'
 >>;
 
 export type UpdateMeResponseDto = {

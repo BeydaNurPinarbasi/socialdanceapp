@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { useTheme } from '../../theme';
 import { AuthStackParamList } from '../../types/navigation';
 import { authService } from '../../services/api/auth';
+import { useProfile } from '../../context/ProfileContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'EmailLogin'>;
 
@@ -15,6 +16,7 @@ const inputBorderColor = 'rgba(255,255,255,0.25)';
 
 export const EmailLoginScreen: React.FC<Props> = ({ navigation }) => {
   const { colors, spacing, typography } = useTheme();
+  const { refreshProfile } = useProfile();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,7 @@ export const EmailLoginScreen: React.FC<Props> = ({ navigation }) => {
     setError(null);
     try {
       await authService.login(email, password);
+      await refreshProfile().catch(() => {});
       navigation.replace('Preferences');
     } catch (e: any) {
       setError(e?.message || 'Giris yapilamadi.');

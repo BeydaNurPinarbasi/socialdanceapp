@@ -21,7 +21,6 @@ export type MainTabsParamList = {
 
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabsParamList>;
-  ExploreSearch: { initialQuery?: string } | undefined;
   EventDetails: { id: string; fromFavorites?: boolean };
   SchoolDetails: { id: string };
   FavoriteSchools: undefined;
@@ -56,6 +55,8 @@ export type MainStackParamList = {
   SettingsHelp: undefined;
   SettingsAbout: undefined;
   UserProfile: { userId: string; name: string; username?: string; avatar: string; bio?: string };
+  InstructorsList: undefined;
+  InstructorOnboarding: undefined;
 };
 
 export type DrawerParamList = {

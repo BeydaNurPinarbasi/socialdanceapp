@@ -8,6 +8,7 @@ export interface StoredProfile {
   email: string;
   favoriteDances?: string[];
   otherInterests?: string;
+  notificationsEnabled?: boolean;
 }
 
 export const DEFAULT_PROFILE: StoredProfile = {
@@ -18,6 +19,7 @@ export const DEFAULT_PROFILE: StoredProfile = {
   email: '',
   favoriteDances: [],
   otherInterests: '',
+  notificationsEnabled: true,
 };
 
 const KEYS = {
@@ -116,11 +118,21 @@ export const storage = {
       email: v.email ?? '',
       favoriteDances: v.favoriteDances ?? [],
       otherInterests: v.otherInterests ?? '',
+      notificationsEnabled: v.notificationsEnabled !== false,
     };
   },
 
   async setProfile(profile: StoredProfile): Promise<void> {
     await this.setItem(KEYS.PROFILE, profile);
+  },
+
+  async getNotificationsEnabled(): Promise<boolean> {
+    const v = await this.getItem<boolean>(KEYS.NOTIFICATIONS_ENABLED);
+    return v !== false;
+  },
+
+  async setNotificationsEnabled(value: boolean): Promise<void> {
+    await this.setItem(KEYS.NOTIFICATIONS_ENABLED, value);
   },
 
   async clearProfile(): Promise<void> {

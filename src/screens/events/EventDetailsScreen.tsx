@@ -233,7 +233,7 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
           />
           <View style={[styles.friendsModalBox, { backgroundColor: '#2C1C2D', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl }]}>
             <Text style={[typography.h4, { color: '#FFFFFF', marginBottom: spacing.md }]}>
-              Katılan arkadaşlar
+              Katılımcılar
             </Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {attendeeList.map((attendee, index) => {
@@ -337,9 +337,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
             ]}
           >
             <View style={styles.friendsRow}>
-              <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>Katılan arkadaşlar</Text>
-              <View style={styles.avatars}>
-                {attendeeList.slice(0, 3).map((attendee, i) => (
+              <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>Katılımcılar</Text>
+              <Text style={[typography.captionBold, { color: 'rgba(255,255,255,0.75)' }]}>{attendeeList.length} kişi</Text>
+            </View>
+            <View style={[styles.avatars, { marginTop: spacing.sm }]}>
+              {attendeeList.map((attendee, i) => (
                     <TouchableOpacity
                       key={attendee.id}
                       activeOpacity={0.8}
@@ -347,12 +349,11 @@ export const EventDetailsScreen: React.FC<Props> = ({ route, navigation }) => {
                         e.stopPropagation();
                         navigation.navigate('UserProfile', { userId: attendee.id, name: attendee.name, avatar: attendee.avatar });
                       }}
-                      style={{ marginLeft: i === 0 ? 0 : -8 }}
+                      style={{ marginRight: 8, marginBottom: 8 }}
                     >
                       <Avatar source={attendee.avatar} size="sm" />
                     </TouchableOpacity>
                   ))}
-              </View>
             </View>
           </TouchableOpacity>
 
@@ -439,7 +440,7 @@ const styles = StyleSheet.create({
   },
   friendsBorder: { borderWidth: 1 },
   friendsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  avatars: { flexDirection: 'row', alignItems: 'center' },
+  avatars: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   dqBanner: { flexDirection: 'row', alignItems: 'center' },
   bottomBar: { flexDirection: 'row', alignItems: 'center' },
   friendsModalOverlay: {

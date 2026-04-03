@@ -20,45 +20,6 @@ type NotificationItem = {
   navigateTo?: { screen: keyof MainStackParamList; params?: object };
 };
 
-const initialNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    type: 'event',
-    title: 'Yaklaşan etkinlik',
-    body: 'Salsa Gecesi yarın 21:00\'da başlıyor. Katılmayı unutma!',
-    time: '2 saat önce',
-    read: false,
-    navigateTo: { screen: 'EventDetails', params: { id: 'e1' } },
-  },
-  {
-    id: '2',
-    type: 'follow',
-    title: 'Yeni takipçi',
-    body: 'Zeynep Su seni takip etmeye başladı.',
-    time: '5 saat önce',
-    read: false,
-    navigateTo: { screen: 'MainTabs', params: { screen: 'Profile' } },
-  },
-  {
-    id: '3',
-    type: 'message',
-    title: 'Yeni mesaj',
-    body: 'Burak: Bu hafta sonu bachata workshop\'una gidelim mi?',
-    time: 'Dün',
-    read: true,
-    navigateTo: { screen: 'ChatDetail', params: { id: 'c1', name: 'Burak', avatar: 'https://i.pravatar.cc/150?u=burak' } },
-  },
-  {
-    id: '4',
-    type: 'system',
-    title: 'Hoş geldin!',
-    body: 'Socialdance ailesine katıldığın için teşekkürler. Keşfet sekmesinden etkinliklere göz atabilirsin.',
-    time: '2 gün önce',
-    read: true,
-    navigateTo: { screen: 'MainTabs', params: { screen: 'Explore' } },
-  },
-];
-
 const typeIcon: Record<NotificationItem['type'], string> = {
   event: 'calendar',
   follow: 'account-plus',
@@ -71,7 +32,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList>;
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors, spacing, radius, typography } = useTheme();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [deleteAllModalVisible, setDeleteAllModalVisible] = useState(false);
 
   const markAllRead = () => {
@@ -98,15 +59,16 @@ export const NotificationsScreen: React.FC = () => {
     }
   };
 
-  const headerRight = (
-    <TouchableOpacity
-      onPress={deleteAll}
-      style={[styles.headerIconBtn, { borderColor: '#9CA3AF', borderRadius: radius.full, borderWidth: 1 }]}
-      activeOpacity={0.7}
-    >
-      <Icon name="delete-outline" size={22} color="#9CA3AF" />
-    </TouchableOpacity>
-  );
+  const headerRight =
+    notifications.length > 0 ? (
+      <TouchableOpacity
+        onPress={deleteAll}
+        style={[styles.headerIconBtn, { borderColor: '#9CA3AF', borderRadius: radius.full, borderWidth: 1 }]}
+        activeOpacity={0.7}
+      >
+        <Icon name="delete-outline" size={22} color="#9CA3AF" />
+      </TouchableOpacity>
+    ) : undefined;
 
   return (
     <Screen>

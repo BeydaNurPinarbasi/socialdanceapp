@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, PanResponder, Dimensions, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Animated, PanResponder, Dimensions, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -27,20 +27,22 @@ export const DanceCircleScreen: React.FC = () => {
   const [index, setIndex] = useState(0);
   const [likedCount, setLikedCount] = useState(0);
   const [dislikedCount, setDislikedCount] = useState(0);
+  const [resetting, setResetting] = useState(false);
   const pan = useRef(new Animated.ValueXY()).current;
 
   const openDrawer = () => (navigation.getParent() as any)?.openDrawer?.();
   const current = candidates[index];
   const next = candidates[index + 1];
 
-  const loadCandidates = useCallback(async () => {
+  const loadCandidates = useCallback(async (opts?: { showLoading?: boolean }) => {
+    const showLoading = opts?.showLoading !== false;
     if (!hasSupabaseConfig()) {
       setError('Supabase yapılandırması eksik.');
       setCandidates([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const rows = await danceCircleService.listCandidates();
@@ -48,12 +50,13 @@ export const DanceCircleScreen: React.FC = () => {
       setIndex(0);
       setLikedCount(0);
       setDislikedCount(0);
+      pan.setValue({ x: 0, y: 0 });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Dans listesi yüklenemedi.';
       setError(msg);
       setCandidates([]);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -121,6 +124,28 @@ export const DanceCircleScreen: React.FC = () => {
     [pan, sendToNextCard],
   );
 
+  const handleResetVotes = useCallback(async () => {
+    if (!hasSupabaseConfig()) return;
+    setResetting(true);
+    try {
+      const { deleted, hadVotesBefore } = await danceCircleService.resetMyVotes();
+      await loadCandidates({ showLoading: false });
+      if (deleted > 0) {
+        Alert.alert('Tamam', `${deleted} oy sıfırlandı, liste yenilendi.`);
+      } else {
+        Alert.alert('Bilgi', 'Sunucuda kayıtlı Dance Circle oyunuz yok. Liste yenilendi.');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Sıfırlanamadı.';
+      Alert.alert(
+        'Sıfırlanamadı',
+        `${msg}\n\nSupabase’de dance_circle_votes için DELETE RLS politikası gerekir. Yerelde: supabase db push veya migration’ı uzak projeye uygulayın.`,
+      );
+    } finally {
+      setResetting(false);
+    }
+  }, [loadCandidates]);
+
   return (
     <Screen>
       <Header
@@ -149,11 +174,25 @@ export const DanceCircleScreen: React.FC = () => {
         ) : (
           <>
         <Text style={[typography.captionBold, { color: colors.textSecondary, marginBottom: spacing.sm }]}>
-          Sağa kaydır: dansını beğen • Sola kaydır: geç
+          Sağa kaydır: dans ettim • Sola kaydır: dans etmedim
         </Text>
-        <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: spacing.md }]}>
-          Beğenilen: {likedCount} · Geçilen: {dislikedCount}
-        </Text>
+        <View style={[styles.hintRow, { marginBottom: spacing.md }]}>
+          <Text style={[typography.caption, { color: colors.textTertiary, flex: 1 }]}>
+            Dans ettim: {likedCount} · Dans etmedim: {dislikedCount}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void handleResetVotes()}
+            disabled={resetting}
+            activeOpacity={0.8}
+            style={[styles.resetBtn, { borderColor: 'rgba(255,255,255,0.25)', borderRadius: radius.full }]}
+          >
+            {resetting ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[typography.captionBold, { color: colors.primary }]}>Sıfırla</Text>
+            )}
+          </TouchableOpacity>
+        </View>
 
         <View style={{ flex: 1 }}>
           {next ? (
@@ -202,14 +241,20 @@ export const DanceCircleScreen: React.FC = () => {
                   </View>
                 )}
                 <View style={styles.gradientOverlay} />
-                <Animated.View style={[styles.edgeIndicator, styles.likeEdge, { opacity: likeOpacity }]}>
-                  <Icon name="thumb-up" size={22} color="#34D399" />
-                  <Text style={styles.edgeLabelLike}>SEÇTİM</Text>
-                </Animated.View>
-                <Animated.View style={[styles.edgeIndicator, styles.nopeEdge, { opacity: nopeOpacity }]}>
-                  <Icon name="close" size={24} color="#F87171" />
-                  <Text style={styles.edgeLabelNope}>GEÇTİM</Text>
-                </Animated.View>
+                <View style={styles.swipeLabelOverlay} pointerEvents="none">
+                  <Animated.View style={[styles.swipeLabelCenterWrap, { opacity: likeOpacity }]}>
+                    <View style={[styles.swipeLabelBadge, styles.swipeLabelLikeBorder]}>
+                      <Icon name="thumb-up" size={22} color="#34D399" />
+                      <Text style={styles.edgeLabelLike}>Dans ettim</Text>
+                    </View>
+                  </Animated.View>
+                  <Animated.View style={[styles.swipeLabelCenterWrap, { opacity: nopeOpacity }]}>
+                    <View style={[styles.swipeLabelBadge, styles.swipeLabelNopeBorder]}>
+                      <Icon name="close" size={24} color="#F87171" />
+                      <Text style={styles.edgeLabelNope}>Dans etmedim</Text>
+                    </View>
+                  </Animated.View>
+                </View>
 
                 <View style={styles.cardContent}>
                   <Text style={[typography.h3, { color: '#FFFFFF' }]}>{current.name}</Text>
@@ -227,7 +272,7 @@ export const DanceCircleScreen: React.FC = () => {
               </TouchableOpacity>
             </Animated.View>
           ) : (
-            <EmptyState icon="heart-outline" title="Şimdilik gösterilecek profil yok." />
+            <EmptyState icon="heart-outline" title="Şimdilik gösterilecek profil yok. Yukarıdaki Sıfırla ile oyları temizleyebilirsin." />
           )}
         </View>
 
@@ -271,34 +316,36 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 18,
   },
-  edgeIndicator: {
-    position: 'absolute',
-    top: '50%',
-    minWidth: 52,
-    height: 62,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    flexDirection: 'row' as const,
-    gap: 6,
-    paddingHorizontal: 12,
-    borderWidth: 2.5,
-    borderRadius: 31,
-    backgroundColor: 'rgba(0,0,0,0.88)',
+  swipeLabelOverlay: {
+    ...StyleSheet.absoluteFillObject,
     zIndex: 20,
-    marginTop: -31,
   },
-  likeEdge: {
-    right: -14,
+  swipeLabelCenterWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeLabelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderWidth: 2.5,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    maxWidth: CARD_WIDTH - 48,
+  },
+  swipeLabelLikeBorder: {
     borderColor: '#34D399',
   },
-  nopeEdge: {
-    left: -14,
+  swipeLabelNopeBorder: {
     borderColor: '#F87171',
   },
   edgeLabelLike: {
     color: '#34D399',
     fontWeight: '900',
-    fontSize: 15,
+    fontSize: 13,
     letterSpacing: 0.4,
     textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 1 },
@@ -307,7 +354,7 @@ const styles = StyleSheet.create({
   edgeLabelNope: {
     color: '#F87171',
     fontWeight: '900',
-    fontSize: 15,
+    fontSize: 13,
     letterSpacing: 0.4,
     textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 1 },
@@ -317,6 +364,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
+  },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resetBtn: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

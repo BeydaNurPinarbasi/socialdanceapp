@@ -11,6 +11,7 @@ export interface Profile {
   email: string;
   favoriteDances: string[];
   otherInterests: string;
+  notificationsEnabled: boolean;
 }
 
 export function getAvatarSource(avatarUri: string | null): string {
@@ -25,7 +26,21 @@ const EMPTY_PROFILE: Profile = {
   email: '',
   favoriteDances: [],
   otherInterests: '',
+  notificationsEnabled: true,
 };
+
+function mapStoredProfileToProfile(stored: StoredProfile): Profile {
+  return {
+    displayName: stored.displayName,
+    username: stored.username,
+    avatarUri: stored.avatarUri,
+    bio: stored.bio,
+    email: stored.email ?? '',
+    favoriteDances: stored.favoriteDances ?? [],
+    otherInterests: stored.otherInterests ?? '',
+    notificationsEnabled: stored.notificationsEnabled !== false,
+  };
+}
 
 interface ProfileContextValue {
   profile: Profile;
@@ -40,20 +55,13 @@ interface ProfileContextValue {
 const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);
 
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [profile, setProfileState] = useState<Profile>({
-    displayName: '',
-    username: '',
-    avatarUri: null,
-    bio: '',
-    email: '',
-    favoriteDances: [],
-    otherInterests: '',
-  });
+  const [profile, setProfileState] = useState<Profile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const applyProfile = useCallback((p: Profile) => {
     setProfileState(p);
+    void storage.setNotificationsEnabled(p.notificationsEnabled !== false);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -80,6 +88,10 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let cancelled = false;
     (async () => {
       try {
+        const storedProfile = await storage.getProfile();
+        if (!cancelled) {
+          applyProfile(mapStoredProfileToProfile(storedProfile));
+        }
         await refreshProfile();
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Profile load failed.');
@@ -92,18 +104,13 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [refreshProfile]);
 
-  const setProfileFromStored = useCallback((stored: StoredProfile) => {
-    setProfileState({
-      displayName: stored.displayName,
-      username: stored.username,
-      avatarUri: stored.avatarUri,
-      bio: stored.bio,
-      email: stored.email ?? '',
-      favoriteDances: stored.favoriteDances ?? [],
-      otherInterests: stored.otherInterests ?? '',
-    });
-    storage.setProfile(stored).catch(() => {});
-  }, []);
+  const setProfileFromStored = useCallback(
+    (stored: StoredProfile) => {
+      applyProfile(mapStoredProfileToProfile(stored));
+      storage.setProfile(stored).catch(() => {});
+    },
+    [applyProfile],
+  );
 
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     setError(null);
@@ -123,10 +130,22 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return nextProfile;
     }
 
-    const remoteProfile = await profileService.updateMe(nextProfile);
-    applyProfile(remoteProfile);
-    await storage.setProfile(remoteProfile);
-    return remoteProfile;
+    try {
+      const remoteProfile = await profileService.updateMe(nextProfile);
+      applyProfile(remoteProfile);
+      await storage.setProfile(remoteProfile);
+      return remoteProfile;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Profil güncellenemedi.');
+      try {
+        const remote = await profileService.getMe();
+        applyProfile(remote);
+        await storage.setProfile(remote);
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    }
   }, [applyProfile, profile]);
 
   const avatarSource = getAvatarSource(profile.avatarUri);

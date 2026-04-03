@@ -23,7 +23,6 @@ const menuItems: MenuItem[] = [
   { label: 'Okullar', icon: 'school-outline', route: 'Schools' },
   { label: 'DanceStar', icon: 'crown-outline', route: 'DanceStar' },
   { label: 'DanceCircle', icon: 'human-female-dance', route: 'DanceCircle' },
-  { label: 'Etkinlikler', icon: 'calendar-outline', route: 'Explore' },
   { label: 'Profil', icon: 'account-outline', route: 'Profile' },
   { label: 'Mesajlar', icon: 'message-outline', route: 'ChatList' },
 ];

@@ -1,23 +1,25 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme';
 import { Screen } from '../../components/layout/Screen';
 import { CollapsingHeaderScrollView } from '../../components/layout/CollapsingHeaderScrollView';
 import { MyEventCard } from '../../components/domain/MyEventCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
-import { mockFavoritesEvents } from '../../constants/mockData';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainStackParamList } from '../../types/navigation';
+import { listAllSchoolEvents } from '../../services/api/schoolEvents';
+import type { MyEventCardData } from '../../components/domain/MyEventCard';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
 
 export const MyEventsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors, spacing, typography } = useTheme();
-  const [events] = useState(mockFavoritesEvents);
+  const [events, setEvents] = useState<MyEventCardData[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(
-    () => new Set(events.filter((e) => e.isFavorite).map((e) => e.id as number))
+    () => new Set()
   );
 
   const toggleFavorite = (id: number) => {
@@ -29,7 +31,54 @@ export const MyEventsScreen: React.FC = () => {
     });
   };
 
-  const filtered = useMemo(() => events.filter((e) => e.isPast), [events]);
+  const loadEvents = useCallback(async () => {
+    const rows = await listAllSchoolEvents(100);
+    const mapped = rows
+      .map((row) => {
+        const startsAt = new Date(row.starts_at);
+        if (Number.isNaN(startsAt.getTime())) return null;
+        return {
+          id: row.id,
+          title: row.title?.trim() || 'Etkinlik',
+          location: row.location?.trim() || 'Konum yakında açıklanacak',
+          date: startsAt.toLocaleString('tr-TR', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          day: startsAt.toLocaleDateString('tr-TR', { day: '2-digit' }),
+          month: startsAt.toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase(),
+          image: row.image_url?.trim() || `https://picsum.photos/seed/event-${encodeURIComponent(row.id)}/400/280`,
+          isFavorite: false,
+          isPopular: false,
+          attendees: 0,
+          attendeeAvatars: [],
+          isDanceStar: false,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+    setEvents(mapped);
+  }, []);
+
+  useEffect(() => {
+    void loadEvents().catch(() => {
+      setEvents([]);
+    });
+  }, [loadEvents]);
+
+  const filtered = useMemo(() => events, [events]);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void loadEvents()
+      .catch(() => {
+        setEvents([]);
+      })
+      .finally(() => {
+        setRefreshing(false);
+      });
+  }, [loadEvents]);
 
   const openDrawer = () => (navigation.getParent() as any)?.openDrawer?.();
 
@@ -37,7 +86,7 @@ export const MyEventsScreen: React.FC = () => {
     <Screen>
       <CollapsingHeaderScrollView
         headerProps={{
-          title: 'Etkinliklerim',
+          title: 'Etkinlikler',
           showLogo: false,
           showBack: false,
           showMenu: true,
@@ -46,6 +95,16 @@ export const MyEventsScreen: React.FC = () => {
           onNotificationPress: () => (navigation.getParent() as any)?.navigate('Notifications'),
         }}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor="rgba(0,0,0,0.25)"
+            progressViewOffset={80}
+          />
+        }
       >
         <View style={{ marginTop: -56 }}>
         <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing.sm }]}>

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, RefreshControl, Platform, Modal, ScrollView } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 import { useProfile } from '../../context/ProfileContext';
@@ -12,8 +12,32 @@ import { UserListItem } from '../../components/domain/UserListItem';
 import { ConfirmModal } from '../../components/feedback/ConfirmModal';
 import { Icon } from '../../components/ui/Icon';
 import { followService } from '../../services/api/follows';
+import { danceCircleService, type DancedWithPerson } from '../../services/api/danceCircle';
+import { hasSupabaseConfig } from '../../services/api/apiClient';
 
 type UserItem = { id: number; name: string; handle: string; img: string };
+
+const ProfileInfoRow: React.FC<{
+  label: string;
+  value: string;
+  multiline?: boolean;
+}> = ({ label, value, multiline }) => {
+  const { typography, spacing, colors } = useTheme();
+  const display = value.trim() ? value : '—';
+  return (
+    <View style={{ marginBottom: spacing.md }}>
+      <Text style={[typography.captionBold, { color: colors.textTertiary, marginBottom: 4 }]}>{label}</Text>
+      <Text
+        style={[
+          multiline ? typography.bodySmall : typography.bodyMedium,
+          { color: '#FFFFFF', lineHeight: multiline ? 22 : undefined },
+        ]}
+      >
+        {display}
+      </Text>
+    </View>
+  );
+};
 
 function isSupabasePublicAvatarUrl(uri: string | null | undefined): boolean {
   if (!uri) return false;
@@ -22,11 +46,11 @@ function isSupabasePublicAvatarUrl(uri: string | null | undefined): boolean {
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const { profile, avatarSource, refreshProfile } = useProfile();
   const [activeTab, setActiveTab] = useState<'following' | 'followers' | 'requests'>('following');
-  const [dancedCount] = useState(42);
+  const [dancedWithList, setDancedWithList] = useState<DancedWithPerson[]>([]);
   const [unfollowedIds, setUnfollowedIds] = useState<Set<number>>(new Set());
   const [confirmModal, setConfirmModal] = useState<{ userId: number; userName: string } | null>(null);
   const [followingList, setFollowingList] = useState<UserItem[]>([]);
@@ -34,9 +58,24 @@ export const ProfileScreen: React.FC = () => {
   const [requestsList, setRequestsList] = useState<UserItem[]>([]);
   const [followCounts, setFollowCounts] = useState<{ following: number; followers: number }>({ following: 0, followers: 0 });
   const [refreshing, setRefreshing] = useState(false);
+  const [dancedModalVisible, setDancedModalVisible] = useState(false);
+  const [followListModalVisible, setFollowListModalVisible] = useState(false);
   const shouldShowAvatarWarning = !!profile.avatarUri && !isSupabasePublicAvatarUrl(profile.avatarUri);
 
   const openDrawer = () => (navigation.getParent() as any)?.openDrawer?.();
+
+  const loadDancedWith = useCallback(async () => {
+    if (!hasSupabaseConfig()) {
+      setDancedWithList([]);
+      return;
+    }
+    try {
+      const rows = await danceCircleService.listMyDancedWith();
+      setDancedWithList(rows);
+    } catch {
+      setDancedWithList([]);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +92,12 @@ export const ProfileScreen: React.FC = () => {
     };
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadDancedWith();
+    }, [loadDancedWith]),
+  );
+
   const onRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -60,6 +105,7 @@ export const ProfileScreen: React.FC = () => {
       await Promise.all([
         refreshProfile(),
         followService.getMyFollowCounts().then((counts) => setFollowCounts({ following: counts.following, followers: counts.followers })),
+        loadDancedWith(),
       ]);
     } catch {
       // ignore: UI already shows cached profile; refresh is best-effort
@@ -98,6 +144,33 @@ export const ProfileScreen: React.FC = () => {
     return requestsList;
   };
 
+  const openDancedModal = () => {
+    void loadDancedWith();
+    setDancedModalVisible(true);
+  };
+
+  const openFollowListModal = (tab: 'following' | 'followers') => {
+    setActiveTab(tab);
+    setFollowListModalVisible(true);
+  };
+
+  const followListModalTitle =
+    activeTab === 'following' ? 'Takip edilenler' : activeTab === 'followers' ? 'Takipçiler' : 'İstekler';
+
+  const nameParts = profile.displayName.trim().split(/\s+/);
+  const profileAd = nameParts[0] ?? '';
+  const profileSoyad = nameParts.slice(1).join(' ');
+
+  const goToDancedUserProfile = (u: DancedWithPerson) => {
+    setDancedModalVisible(false);
+    (navigation.getParent() as any)?.navigate('UserProfile', {
+      userId: u.id,
+      name: u.name,
+      username: u.username || undefined,
+      avatar: u.avatar,
+    });
+  };
+
   return (
     <Screen>
       <ConfirmModal
@@ -113,6 +186,162 @@ export const ProfileScreen: React.FC = () => {
         onCancel={() => setConfirmModal(null)}
         onConfirm={handleConfirmUnfollow}
       />
+
+      <Modal visible={dancedModalVisible} transparent animationType="slide" onRequestClose={() => setDancedModalVisible(false)}>
+        <View style={styles.dancedModalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setDancedModalVisible(false)} />
+          <View
+            style={[
+              styles.dancedModalSheet,
+              {
+                backgroundColor: colors.headerBg ?? '#2C1C2D',
+                borderTopLeftRadius: radius.xl,
+                borderTopRightRadius: radius.xl,
+                paddingBottom: insets.bottom + spacing.lg,
+                maxHeight: '88%',
+              },
+            ]}
+          >
+            <View style={styles.dancedModalHandle} />
+            <View style={[styles.dancedModalHeader, { paddingHorizontal: spacing.lg }]}>
+              <Text style={[typography.h4, { color: '#FFFFFF' }]}>Dans edilenler</Text>
+              <TouchableOpacity
+                onPress={() => setDancedModalVisible(false)}
+                activeOpacity={0.8}
+                style={[styles.dancedModalClose, { borderRadius: radius.full, borderColor: 'rgba(255,255,255,0.2)' }]}
+              >
+                <Icon name="close" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {dancedWithList.length > 0 ? (
+                dancedWithList.map((u) => (
+                  <UserListItem
+                    key={u.id}
+                    name={u.name}
+                    subtitle={u.username ? `@${u.username}` : undefined}
+                    avatar={u.avatar}
+                    onPress={() => goToDancedUserProfile(u)}
+                    nameColor="#FFFFFF"
+                    subtitleColor="#9CA3AF"
+                  />
+                ))
+              ) : (
+                <Text style={[typography.bodySmall, { color: '#9CA3AF', paddingVertical: spacing.xl, textAlign: 'center' }]}>
+                  {hasSupabaseConfig()
+                    ? "Dance Circle'da sağa kaydırdığın kişiler burada listelenir."
+                    : 'Dans ettiklerinizi görmek için uygulama yapılandırması gerekir.'}
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={followListModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFollowListModalVisible(false)}
+      >
+        <View style={styles.dancedModalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setFollowListModalVisible(false)} />
+          <View
+            style={[
+              styles.dancedModalSheet,
+              {
+                backgroundColor: colors.headerBg ?? '#2C1C2D',
+                borderTopLeftRadius: radius.xl,
+                borderTopRightRadius: radius.xl,
+                paddingBottom: insets.bottom + spacing.lg,
+                maxHeight: '88%',
+              },
+            ]}
+          >
+            <View style={styles.dancedModalHandle} />
+            <View style={[styles.dancedModalHeader, { paddingHorizontal: spacing.lg }]}>
+              <Text style={[typography.h4, { color: '#FFFFFF' }]}>{followListModalTitle}</Text>
+              <TouchableOpacity
+                onPress={() => setFollowListModalVisible(false)}
+                activeOpacity={0.8}
+                style={[styles.dancedModalClose, { borderRadius: radius.full, borderColor: 'rgba(255,255,255,0.2)' }]}
+              >
+                <Icon name="close" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.md }}>
+              <TabSwitch
+                tabs={[
+                  { key: 'following', label: 'Takip Edilen' },
+                  { key: 'followers', label: 'Takipçiler' },
+                  { key: 'requests', label: 'İstekler', badge: requestsList.length > 0 ? requestsList.length : undefined },
+                ]}
+                activeTab={activeTab}
+                onTabChange={(k) => setActiveTab(k as 'following' | 'followers' | 'requests')}
+                containerRadius={50}
+                containerBgColor="#311831"
+                indicatorColor="#020617"
+                textColor="#9CA3AF"
+                activeTextColor="#FFFFFF"
+              />
+            </View>
+            <ScrollView
+              style={{ flexGrow: 1, maxHeight: 420 }}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
+              {getList().length > 0 ? (
+                getList().map((user: UserItem) => {
+                  const isUnfollowed = activeTab === 'following' && unfollowedIds.has(user.id);
+                  const rightLabel =
+                    activeTab === 'requests' ? 'Onayla' : isUnfollowed ? 'Takip Et' : 'Takipten Çık';
+                  const onRightPress =
+                    activeTab === 'requests'
+                      ? () => handleAcceptRequest(user)
+                      : isUnfollowed
+                        ? () => handleFollowPress(user.id)
+                        : () => handleUnfollowPress(user.id, user.name);
+                  return (
+                    <UserListItem
+                      key={user.id}
+                      name={user.name}
+                      subtitle={user.handle}
+                      avatar={user.img}
+                      onPress={() => {
+                        setFollowListModalVisible(false);
+                        (navigation.getParent() as any)?.navigate('UserProfile', {
+                          userId: String(user.id),
+                          name: user.name,
+                          username: user.handle,
+                          avatar: user.img,
+                        });
+                      }}
+                      rightLabel={rightLabel}
+                      rightVariant={activeTab === 'requests' ? 'primary' : 'outline'}
+                      onRightPress={onRightPress}
+                      nameColor="#FFFFFF"
+                      subtitleColor="#9CA3AF"
+                      rightButtonBorderColor="#9CA3AF"
+                      rightButtonTextColor="#9CA3AF"
+                    />
+                  );
+                })
+              ) : (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <Text style={[typography.bodySmall, { color: '#FFFFFF' }]}>Henüz kimse yok.</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <CollapsingHeaderScrollView
         headerProps={{
           title: 'Profil',
@@ -156,107 +385,76 @@ export const ProfileScreen: React.FC = () => {
         {profile.username ? (
           <Text style={[typography.bodySmall, { color: '#FFFFFF' }]}>@{profile.username}</Text>
         ) : null}
-        {profile.bio ? (
-          <Text style={[typography.bodySmall, { color: '#9CA3AF', textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.xxl }]}>
-            {profile.bio}
-          </Text>
-        ) : null}
         {shouldShowAvatarWarning ? (
           <Text style={[typography.caption, { color: '#F59E0B', textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.xl }]}>
             Uyarı: Profil fotoğrafınızın güncellenmesi için fotoğrafınızı tekrar seçip Kaydet yapın.
           </Text>
         ) : null}
 
-        <View style={{ width: '100%', paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
-          <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginBottom: spacing.sm }]}>Favori danslar</Text>
-          {profile.favoriteDances?.length ? (
-            <View style={styles.tagsRow}>
-              {profile.favoriteDances.map((dance) => (
-                <View key={dance} style={[styles.tag, { borderColor: 'rgba(255,255,255,0.12)' }]}>
-                  <Icon name="music" size={14} color={colors.primary} style={{ marginRight: 6 }} />
-                  <Text style={[typography.captionBold, { color: '#FFFFFF' }]}>{dance}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={[typography.caption, { color: '#9CA3AF' }]}>Henüz seçmedin.</Text>
-          )}
+        <View style={[styles.statsRow, { backgroundColor: '#311831', borderRadius: 50, padding: spacing.lg, marginTop: spacing.lg, borderWidth: 0.5, borderColor: '#9CA3AF' }]}>
+          <TouchableOpacity style={styles.statItem} onPress={() => openFollowListModal('following')}>
+            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followCounts.following}</Text>
+            <Text style={[typography.label, { color: '#FFFFFF' }]}>Takip Edilen</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statItem} onPress={() => openFollowListModal('followers')}>
+            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followCounts.followers}</Text>
+            <Text style={[typography.label, { color: '#FFFFFF' }]}>Takipçi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statItem} onPress={openDancedModal} activeOpacity={0.75}>
+            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{dancedWithList.length}</Text>
+            <Text style={[typography.label, { color: '#FFFFFF' }]}>Dans Edilen</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ width: '100%', paddingHorizontal: spacing.lg, marginTop: spacing.lg, alignSelf: 'stretch' }}>
+          <View
+            style={[
+              styles.infoCard,
+              {
+                backgroundColor: '#311831',
+                borderColor: colors.cardBorder,
+                borderRadius: radius.xl,
+                padding: spacing.lg,
+              },
+            ]}
+          >
+            <Text style={[typography.bodySmallBold, { color: '#FFFFFF', marginBottom: spacing.md }]}>Profil bilgileri</Text>
+
+            <ProfileInfoRow label="Ad" value={profileAd} />
+            <ProfileInfoRow label="Soyad" value={profileSoyad} />
+            <ProfileInfoRow label="Kullanıcı adı" value={profile.username ? `@${profile.username}` : ''} />
+            <ProfileInfoRow label="E-posta" value={profile.email} />
+            <ProfileInfoRow label="Hakkımda" value={profile.bio} multiline />
+            {profile.otherInterests.trim() ? (
+              <ProfileInfoRow label="Diğer ilgi alanları" value={profile.otherInterests} multiline />
+            ) : null}
+
+            <Text style={[typography.captionBold, { color: colors.textTertiary, marginBottom: spacing.sm, marginTop: spacing.xs }]}>
+              Favori danslar
+            </Text>
+            {profile.favoriteDances?.length ? (
+              <View style={styles.tagsRow}>
+                {profile.favoriteDances.map((dance) => (
+                  <View key={dance} style={[styles.tag, { borderColor: 'rgba(255,255,255,0.12)' }]}>
+                    <Icon name="music" size={14} color={colors.primary} style={{ marginRight: 6 }} />
+                    <Text style={[typography.captionBold, { color: '#FFFFFF' }]}>{dance}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[typography.caption, { color: '#9CA3AF' }]}>Henüz seçmedin.</Text>
+            )}
+          </View>
         </View>
 
         <TouchableOpacity
           onPress={() => (navigation.getParent() as any)?.navigate('EditProfile')}
           activeOpacity={0.8}
-          style={[styles.editProfileBtn, { backgroundColor: '#4B154B', borderRadius: 50, marginTop: spacing.xl }]}
+          style={[styles.editProfileBtn, { backgroundColor: '#4B154B', borderRadius: 50, marginTop: spacing.lg }]}
         >
           <Text style={[typography.bodySmallBold, { color: '#FFFFFF' }]}>Profili düzenle</Text>
         </TouchableOpacity>
 
-        <View style={[styles.statsRow, { backgroundColor: '#311831', borderRadius: 50, padding: spacing.lg, marginTop: spacing.md, borderWidth: 0.5, borderColor: '#9CA3AF' }]}>
-          <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('following')}>
-            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followCounts.following}</Text>
-            <Text style={[typography.label, { color: '#FFFFFF' }]}>Takip Edilen</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.statItem} onPress={() => setActiveTab('followers')}>
-            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{followCounts.followers}</Text>
-            <Text style={[typography.label, { color: '#FFFFFF' }]}>Takipçi</Text>
-          </TouchableOpacity>
-          <View style={styles.statItem}>
-            <Text style={[typography.bodyBold, { color: '#FFFFFF' }]}>{dancedCount}</Text>
-            <Text style={[typography.label, { color: '#FFFFFF' }]}>Dans Edilen</Text>
-          </View>
-        </View>
-
-        <View style={{ width: '100%', paddingHorizontal: spacing.lg, marginTop: spacing.xl }}>
-          <TabSwitch
-            tabs={[
-              { key: 'following', label: 'Takip Edilen' },
-              { key: 'followers', label: 'Takipçiler' },
-              { key: 'requests', label: 'İstekler', badge: requestsList.length > 0 ? requestsList.length : undefined },
-            ]}
-            activeTab={activeTab}
-            onTabChange={(k) => setActiveTab(k as any)}
-            containerRadius={50}
-            containerBgColor="#311831"
-            indicatorColor="#020617"
-            textColor="#9CA3AF"
-            activeTextColor="#FFFFFF"
-          />
-          <View style={{ marginTop: spacing.lg }}>
-            {getList().length > 0 ? (
-              getList().map((user: any) => {
-                const isUnfollowed = activeTab === 'following' && unfollowedIds.has(user.id);
-                const rightLabel =
-                  activeTab === 'requests' ? 'Onayla' : isUnfollowed ? 'Takip Et' : 'Takipten Çık';
-                const onRightPress =
-                  activeTab === 'requests'
-                    ? () => handleAcceptRequest(user)
-                    : isUnfollowed
-                      ? () => handleFollowPress(user.id)
-                      : () => handleUnfollowPress(user.id, user.name);
-                return (
-                  <UserListItem
-                    key={user.id}
-                    name={user.name}
-                    subtitle={user.handle}
-                    avatar={user.img}
-                    onPress={() => (navigation.getParent() as any)?.navigate('UserProfile', { userId: String(user.id), name: user.name, username: user.handle, avatar: user.img })}
-                    rightLabel={rightLabel}
-                    rightVariant={activeTab === 'requests' ? 'primary' : 'outline'}
-                    onRightPress={onRightPress}
-                    nameColor="#FFFFFF"
-                    subtitleColor="#9CA3AF"
-                    rightButtonBorderColor="#9CA3AF"
-                    rightButtonTextColor="#9CA3AF"
-                  />
-                );
-              })
-            ) : (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <Text style={[typography.bodySmall, { color: '#FFFFFF' }]}>Henüz kimse yok.</Text>
-              </View>
-            )}
-          </View>
-        </View>
       </CollapsingHeaderScrollView>
     </Screen>
   );
@@ -264,6 +462,10 @@ export const ProfileScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   avatarRing: { padding: 4, borderRadius: 9999, borderWidth: 2 },
+  infoCard: {
+    borderWidth: 1,
+    width: '100%',
+  },
   editProfileBtn: {
     width: '80%',
     paddingVertical: 14,
@@ -281,5 +483,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: '#311831',
     borderRadius: 9999,
+  },
+  dancedModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  dancedModalSheet: {
+    paddingTop: 10,
+  },
+  dancedModalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  dancedModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  dancedModalClose: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
 });
